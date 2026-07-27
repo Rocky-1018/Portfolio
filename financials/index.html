@@ -212,14 +212,50 @@ body{
   border-radius:14px;padding:4px 10px;font-size:11.5px;margin:3px 4px 0 0;
 }
 .chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;}
+
+/* ---- Login ---- */
+.login-overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;
+}
+.login-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:32px 30px;width:100%;max-width:340px;
+}
+.login-card h1{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0 0 6px;}
+.login-card p{color:var(--muted);font-size:12.5px;margin:0 0 20px;}
+.login-card .field{margin-bottom:14px;}
+.login-error{color:var(--coral);font-size:12.5px;margin-top:10px;min-height:16px;}
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h1>Ledger</h1>
+    <p>Sign in to continue.</p>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="loginUser" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <button class="add-btn" id="loginBtn">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="display:none;">
 
   <div class="topbar">
     <h1>Ledger</h1>
-    <div class="sub" id="periodLabel">—</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="sub" id="periodLabel">—</div>
+      <button class="manage-link" id="logoutBtn">log out</button>
+    </div>
   </div>
 
   <div class="receipt">
@@ -307,22 +343,71 @@ body{
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvc7auhaAhbIXboJKxWoMCgELuJQxJFpnZzzt5stHXskigl3TJpXmkaXcxDqRJ4bp6Rw/exec';
+const K_TOKEN = 'ledger-auth-token';
+
+let authToken = localStorage.getItem(K_TOKEN) || '';
 
 window.storage = {
   async get(key){
-    const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}`);
+    const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}&token=${encodeURIComponent(authToken)}`);
     const data = await res.json();
+    if(data.error === 'unauthorized'){ forceLogout(); return null; }
     if(data.value === null || data.value === undefined) return null;
     return { value: data.value };
   },
   async set(key, value){
-    await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}`, {
+    const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}&token=${encodeURIComponent(authToken)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: value
     });
+    const data = await res.json();
+    if(data.error === 'unauthorized'){ forceLogout(); }
   }
 };
+
+function forceLogout(){
+  localStorage.removeItem(K_TOKEN);
+  authToken = '';
+  document.getElementById('appWrap').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginError').textContent = 'Session expired — sign in again.';
+}
+
+async function attemptLogin(){
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!username || !password){ errEl.textContent = 'Enter a username and password.'; return; }
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if(data.ok && data.token){
+      authToken = data.token;
+      localStorage.setItem(K_TOKEN, authToken);
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('appWrap').style.display = 'block';
+      await init();
+    } else {
+      errEl.textContent = 'Incorrect username or password.';
+    }
+  }catch(err){
+    errEl.textContent = 'Could not reach the server. Try again.';
+  }
+}
+
+function wireLogin(){
+  document.getElementById('loginBtn').addEventListener('click', attemptLogin);
+  ['loginUser','loginPass'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+  });
+  document.getElementById('logoutBtn').addEventListener('click', forceLogout);
+}
 
 const K_EXPENSES = 'expenses-v1';
 const K_CATEGORIES = 'categories-v1';
@@ -623,7 +708,15 @@ async function init(){
   wireEvents();
   renderAll();
 }
-init();
+
+wireLogin();
+if(authToken){
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('appWrap').style.display = 'block';
+  init();
+} else {
+  document.getElementById('loginUser').focus();
+}
 </script>
 </body>
 </html>
