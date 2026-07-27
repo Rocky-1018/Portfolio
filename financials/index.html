@@ -320,7 +320,7 @@ body{
     </div>
 
     <div class="card">
-      <h2>Recent expenses</h2>
+      <h2>Expenses this period</h2>
       <div class="tx-list" id="txList"></div>
     </div>
 
@@ -347,7 +347,7 @@ body{
     </div>
 
     <div class="card">
-      <h2>Recent income</h2>
+      <h2>Income this period</h2>
       <div class="tx-list" id="incomeList"></div>
     </div>
 
@@ -599,9 +599,9 @@ function renderCatChips(){
 
 function renderTxList(){
   const list = document.getElementById('txList');
-  const sorted = [...expenses].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  const sorted = expenses.filter(e=>inPeriod(e.date)).sort((a,b)=> b.date.localeCompare(a.date) || 0);
   if(sorted.length===0){
-    list.innerHTML = '<div class="tx-empty">No expenses yet — add your first one.</div>';
+    list.innerHTML = '<div class="tx-empty">No expenses in this period yet.</div>';
     return;
   }
   list.innerHTML = sorted.map(tx=>`
@@ -627,9 +627,9 @@ function renderTxList(){
 
 function renderIncomeList(){
   const list = document.getElementById('incomeList');
-  const sorted = [...income].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  const sorted = income.filter(i=>inPeriod(i.date)).sort((a,b)=> b.date.localeCompare(a.date) || 0);
   if(sorted.length===0){
-    list.innerHTML = '<div class="tx-empty">No income logged yet — add your first entry.</div>';
+    list.innerHTML = '<div class="tx-empty">No income in this period yet.</div>';
     return;
   }
   list.innerHTML = sorted.map(tx=>`
