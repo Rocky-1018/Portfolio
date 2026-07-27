@@ -151,7 +151,7 @@ body{
 }
 
 /* ---- Transactions list ---- */
-.tx-list{max-height:290px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.tx-list{max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
 .tx-row{
   display:flex;align-items:center;gap:10px;
   padding:9px 4px;
@@ -163,7 +163,9 @@ body{
 .tx-main{flex:1;min-width:0;}
 .tx-desc{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tx-sub{color:var(--muted);font-size:11px;}
-.tx-amount{font-family:'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;}
+.tx-amount{font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+.tx-amount.expense{color:var(--coral);}
+.tx-amount.income{color:var(--mint);}
 .tx-del{
   background:none;border:none;color:var(--muted);
   cursor:pointer;font-size:15px;line-height:1;padding:4px 6px;
@@ -179,10 +181,6 @@ body{
 .cat-row-top .val{font-family:'JetBrains Mono',monospace;color:var(--muted);}
 .bar-track{height:6px;background:var(--panel-raised);border-radius:3px;overflow:hidden;}
 .bar-fill{height:100%;border-radius:3px;}
-
-/* ---- Income settings ---- */
-.settings-body{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
-.settings-body.open{display:block;}
 
 /* ---- Allocation ---- */
 .alloc-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
@@ -205,7 +203,6 @@ body{
 .manage-panel.open{display:block;}
 .manage-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;}
 .manage-row input[type=text]{flex:1;}
-.manage-row select{width:110px;}
 .chip{
   display:inline-flex;align-items:center;gap:6px;
   background:var(--panel-raised);border:1px solid var(--line);
@@ -276,21 +273,28 @@ body{
     <div class="receipt-figure" id="leftoverFigure">$0.00</div>
     <div class="receipt-meta">
       <div>Income<b id="metaIncome">$0</b></div>
-      <div>Fixed<b id="metaFixed">$0</b></div>
-      <div>Variable<b id="metaVariable">$0</b></div>
-      <div>Total spent<b id="metaTotal">$0</b></div>
+      <div>Expenses<b id="metaExpense">$0</b></div>
     </div>
   </div>
 
   <div class="grid">
 
     <div class="card">
-      <h2>Add an expense</h2>
+      <h2>Add transaction</h2>
       <div class="form-row">
+        <div class="field">
+          <label>Type</label>
+          <select id="inType">
+            <option value="expense" selected>Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
         <div class="field amount-field">
           <label>Amount (CAD)</label>
           <input type="number" id="inAmount" placeholder="0.00" step="0.01">
         </div>
+      </div>
+      <div class="form-row" id="categoryRow">
         <div class="field">
           <label>Category</label>
           <select id="inCategory"></select>
@@ -298,7 +302,7 @@ body{
       </div>
       <div class="form-row">
         <div class="field">
-          <label>Description</label>
+          <label id="descLabel">Description</label>
           <input type="text" id="inDesc" placeholder="e.g. groceries at Save-On">
         </div>
         <div class="field" style="max-width:150px;">
@@ -312,7 +316,6 @@ body{
       <div class="manage-panel" id="managePanel">
         <div class="manage-row">
           <input type="text" id="newCatName" placeholder="New category name">
-          <select id="newCatType"><option value="Fixed">Fixed</option><option value="Variable" selected>Variable</option></select>
           <button class="add-btn" style="width:auto;padding:8px 12px;" id="addCatBtn">Add</button>
         </div>
         <div id="catChips"></div>
@@ -320,35 +323,8 @@ body{
     </div>
 
     <div class="card">
-      <h2>Expenses this period</h2>
+      <h2>Transactions this month</h2>
       <div class="tx-list" id="txList"></div>
-    </div>
-
-    <div class="card">
-      <h2>Add income</h2>
-      <div class="form-row">
-        <div class="field amount-field">
-          <label>Amount (CAD)</label>
-          <input type="number" id="inIncomeAmount" placeholder="0.00" step="0.01">
-        </div>
-        <div class="field" style="max-width:150px;">
-          <label>Date</label>
-          <input type="date" id="inIncomeDate">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="field">
-          <label>Source</label>
-          <input type="text" id="inIncomeDesc" placeholder="e.g. paycheck, freelance">
-        </div>
-      </div>
-      <button class="add-btn" id="addIncomeBtn">Add income</button>
-      <div class="hint">Press Enter in any field to add instantly.</div>
-    </div>
-
-    <div class="card">
-      <h2>Income this period</h2>
-      <div class="tx-list" id="incomeList"></div>
     </div>
 
     <div class="card">
@@ -357,19 +333,9 @@ body{
     </div>
 
     <div class="card">
-      <h2>Period & allocation <button class="manage-link" style="float:right;" id="toggleSettings">edit</button></h2>
-      <div id="settingsSummary" style="font-size:13px;color:var(--muted);">The period range and leftover allocation live here.</div>
-      <div class="settings-body" id="settingsBody">
-        <div class="form-row">
-          <div class="field"><label>Period start</label><input type="date" id="periodStart"></div>
-          <div class="field"><label>Period end</label><input type="date" id="periodEnd"></div>
-        </div>
-        <button class="add-btn" id="saveSettingsBtn">Save</button>
-
-        <h2 style="margin-top:20px;">Allocate the leftover</h2>
-        <div id="allocRows"></div>
-        <div class="hint" id="allocCheck"></div>
-      </div>
+      <h2>Allocate the leftover</h2>
+      <div id="allocRows"></div>
+      <div class="hint" id="allocCheck"></div>
     </div>
 
     <div class="card insights-card">
@@ -459,7 +425,6 @@ function wireLogin(){
 const K_EXPENSES = 'expenses-v1';
 const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
-const K_SETTINGS = 'settings-v1';
 const K_ALLOC = 'allocation-v1';
 
 const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0','#E39E5B','#8FBF6B','#D97BA8','#9AA5B1'];
@@ -467,7 +432,6 @@ const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0',
 let expenses = [];
 let income = [];
 let categories = [];
-let settings = { periodStart:null, periodEnd:null };
 let allocation = [
   {name:'Emergency Fund', pct:0.25},
   {name:'TFSA investing', pct:0.40},
@@ -482,7 +446,6 @@ function money(n){
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function firstOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(),1).toISOString().slice(0,10); }
-function lastOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth()+1,0).toISOString().slice(0,10); }
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -509,27 +472,10 @@ async function loadAll(){
   try{
     categories = bundle.categories ? JSON.parse(bundle.categories) : null;
   }catch(err){ categories = null; }
-  if(!categories){
-    categories = [
-      {name:'Rent', type:'Fixed'},
-      {name:'Transit', type:'Fixed'},
-      {name:'Food', type:'Fixed'},
-      {name:'Phone', type:'Variable'},
-      {name:'Subscriptions', type:'Variable'},
-      {name:'Personal Care', type:'Variable'},
-      {name:'Gaming/Hobbies', type:'Variable'},
-      {name:'Remittance', type:'Variable'},
-      {name:'Misc/Buffer', type:'Variable'},
-      {name:'Other', type:'Variable'},
-    ];
+  if(!categories || categories.length === 0){
+    categories = ['Rent','Transit','Food','Phone','Subscriptions','Personal Care','Gaming/Hobbies','Remittance','Misc/Buffer','Other'];
     await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
   }
-
-  try{
-    if(bundle.settings) settings = JSON.parse(bundle.settings);
-  }catch(err){}
-  if(!settings.periodStart) settings.periodStart = firstOfMonth();
-  if(!settings.periodEnd) settings.periodEnd = lastOfMonth();
 
   try{
     if(bundle.allocation) allocation = JSON.parse(bundle.allocation);
@@ -537,7 +483,7 @@ async function loadAll(){
 
   // seed example expenses on very first run
   if(expenses.length === 0){
-    const d = settings.periodStart;
+    const d = firstOfMonth();
     expenses = [
       {id:cryptoId(), date:d, category:'Rent', desc:'Monthly rent', amount:700},
       {id:cryptoId(), date:d, category:'Transit', desc:'Monthly transit pass', amount:156},
@@ -549,25 +495,16 @@ async function loadAll(){
 
 function cryptoId(){ return 'x' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 
-function catType(name){
-  const c = categories.find(c=>c.name===name);
-  return c ? c.type : 'Variable';
-}
 function catColor(name){
-  const idx = categories.findIndex(c=>c.name===name);
+  const idx = categories.indexOf(name);
   return CAT_COLORS[(idx>=0?idx:0) % CAT_COLORS.length];
 }
 
-function periodIncome(){
-  return income.filter(i=>inPeriod(i.date)).reduce((s,i)=>s+Number(i.amount), 0);
-}
-
-function inPeriod(dateStr){
-  if(!settings.periodStart && !settings.periodEnd) return true;
+function isThisMonth(dateStr){
+  if(!dateStr) return false;
   const d = new Date(dateStr);
-  if(settings.periodStart && d < new Date(settings.periodStart)) return false;
-  if(settings.periodEnd && d > new Date(settings.periodEnd)) return false;
-  return true;
+  const now = new Date();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
 }
 
 function monthKey(dateStr){ return (dateStr||'').slice(0,7); }
@@ -579,13 +516,13 @@ function monthLabel(key){
 
 function renderCategorySelect(){
   const sel = document.getElementById('inCategory');
-  sel.innerHTML = categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+  sel.innerHTML = categories.map(name=>`<option value="${name}">${name}</option>`).join('');
 }
 
 function renderCatChips(){
   const el = document.getElementById('catChips');
-  el.innerHTML = categories.map((c,i)=>`
-    <span class="chip">${c.name} · ${c.type} <button data-idx="${i}" class="chip-del">×</button></span>
+  el.innerHTML = categories.map((name,i)=>`
+    <span class="chip">${name} <button data-idx="${i}" class="chip-del">×</button></span>
   `).join('');
   el.querySelectorAll('.chip-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -599,56 +536,42 @@ function renderCatChips(){
 
 function renderTxList(){
   const list = document.getElementById('txList');
-  const sorted = expenses.filter(e=>inPeriod(e.date)).sort((a,b)=> b.date.localeCompare(a.date) || 0);
-  if(sorted.length===0){
-    list.innerHTML = '<div class="tx-empty">No expenses in this period yet.</div>';
+  const expRows = expenses.filter(e=>isThisMonth(e.date)).map(e=>({...e, kind:'expense'}));
+  const incRows = income.filter(i=>isThisMonth(i.date)).map(i=>({...i, kind:'income'}));
+  const combined = [...expRows, ...incRows].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  if(combined.length===0){
+    list.innerHTML = '<div class="tx-empty">No transactions this month yet.</div>';
     return;
   }
-  list.innerHTML = sorted.map(tx=>`
+  list.innerHTML = combined.map(tx=>{
+    const isExpense = tx.kind==='expense';
+    const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
+    const sub = isExpense ? `${tx.category} · ${tx.date}` : tx.date;
+    const desc = tx.desc || (isExpense ? tx.category : 'Income');
+    const sign = isExpense ? '-' : '+';
+    return `
     <div class="tx-row" data-id="${tx.id}">
-      <span class="tx-cat-dot" style="background:${catColor(tx.category)}"></span>
+      <span class="tx-cat-dot" style="background:${dot}"></span>
       <div class="tx-main">
-        <div class="tx-desc">${tx.desc || tx.category}</div>
-        <div class="tx-sub">${tx.category} · ${tx.date}</div>
+        <div class="tx-desc">${desc}</div>
+        <div class="tx-sub">${sub}</div>
       </div>
-      <div class="tx-amount">${money(tx.amount)}</div>
-      <button class="tx-del" data-id="${tx.id}">×</button>
-    </div>
-  `).join('');
+      <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
+      <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
+    </div>`;
+  }).join('');
   list.querySelectorAll('.tx-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      expenses = expenses.filter(e=>e.id !== btn.dataset.id);
-      await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+      const kind = btn.dataset.kind;
+      if(kind==='expense'){
+        expenses = expenses.filter(e=>e.id !== btn.dataset.id);
+        await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+      } else {
+        income = income.filter(i=>i.id !== btn.dataset.id);
+        await window.storage.set(K_INCOME, JSON.stringify(income));
+      }
       renderAll();
-      showToast('Expense removed');
-    });
-  });
-}
-
-function renderIncomeList(){
-  const list = document.getElementById('incomeList');
-  const sorted = income.filter(i=>inPeriod(i.date)).sort((a,b)=> b.date.localeCompare(a.date) || 0);
-  if(sorted.length===0){
-    list.innerHTML = '<div class="tx-empty">No income in this period yet.</div>';
-    return;
-  }
-  list.innerHTML = sorted.map(tx=>`
-    <div class="tx-row" data-id="${tx.id}">
-      <span class="tx-cat-dot" style="background:var(--mint)"></span>
-      <div class="tx-main">
-        <div class="tx-desc">${tx.desc || 'Income'}</div>
-        <div class="tx-sub">${tx.date}</div>
-      </div>
-      <div class="tx-amount">${money(tx.amount)}</div>
-      <button class="tx-del" data-id="${tx.id}">×</button>
-    </div>
-  `).join('');
-  list.querySelectorAll('.tx-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      income = income.filter(i=>i.id !== btn.dataset.id);
-      await window.storage.set(K_INCOME, JSON.stringify(income));
-      renderAll();
-      showToast('Income entry removed');
+      showToast('Removed');
     });
   });
 }
@@ -701,37 +624,33 @@ function renderMonthlyInsights(){
 
 function renderCatBreakdown(){
   const el = document.getElementById('catBreakdown');
-  const periodExpenses = expenses.filter(e=>inPeriod(e.date));
+  const monthExpenses = expenses.filter(e=>isThisMonth(e.date));
   const totals = {};
-  categories.forEach(c=>totals[c.name]=0);
-  periodExpenses.forEach(e=>{ totals[e.category] = (totals[e.category]||0) + Number(e.amount); });
+  categories.forEach(name=>totals[name]=0);
+  monthExpenses.forEach(e=>{ totals[e.category] = (totals[e.category]||0) + Number(e.amount); });
   const maxVal = Math.max(1, ...Object.values(totals));
-  el.innerHTML = categories.map(c=>{
-    const v = totals[c.name]||0;
+  el.innerHTML = categories.map(name=>{
+    const v = totals[name]||0;
     const pct = Math.min(100, (v/maxVal)*100);
     return `
       <div class="cat-row">
-        <div class="cat-row-top"><span class="name">${c.name}</span><span class="val">${money(v)}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${catColor(c.name)}"></div></div>
+        <div class="cat-row-top"><span class="name">${name}</span><span class="val">${money(v)}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${catColor(name)}"></div></div>
       </div>`;
   }).join('');
 }
 
 function computeTotals(){
-  const periodExpenses = expenses.filter(e=>inPeriod(e.date));
-  let fixed=0, variable=0;
-  periodExpenses.forEach(e=>{
-    if(catType(e.category)==='Fixed') fixed += Number(e.amount);
-    else variable += Number(e.amount);
-  });
-  const inc = periodIncome();
-  const total = fixed+variable;
-  const leftover = inc - total;
-  return {income: inc, fixed, variable, total, leftover};
+  const monthExpenses = expenses.filter(e=>isThisMonth(e.date));
+  const monthIncome = income.filter(i=>isThisMonth(i.date));
+  const expenseTotal = monthExpenses.reduce((s,e)=>s+Number(e.amount), 0);
+  const incomeTotal = monthIncome.reduce((s,i)=>s+Number(i.amount), 0);
+  const leftover = incomeTotal - expenseTotal;
+  return {income: incomeTotal, expense: expenseTotal, leftover};
 }
 
 function renderHero(prevLeftover){
-  const {income, fixed, variable, total, leftover} = computeTotals();
+  const {income, expense, leftover} = computeTotals();
   const fig = document.getElementById('leftoverFigure');
   fig.textContent = money(leftover);
   fig.classList.toggle('negative', leftover < 0);
@@ -740,12 +659,10 @@ function renderHero(prevLeftover){
     setTimeout(()=>fig.classList.remove('flash'), 250);
   }
   document.getElementById('metaIncome').textContent = money(income);
-  document.getElementById('metaFixed').textContent = money(fixed);
-  document.getElementById('metaVariable').textContent = money(variable);
-  document.getElementById('metaTotal').textContent = money(total);
+  document.getElementById('metaExpense').textContent = money(expense);
 
   const label = document.getElementById('periodLabel');
-  label.textContent = (settings.periodStart||'') + ' → ' + (settings.periodEnd||'');
+  label.textContent = new Date().toLocaleDateString('en-CA', {month:'long', year:'numeric'});
 }
 
 function renderAllocation(){
@@ -777,7 +694,6 @@ function renderAllocation(){
 let lastLeftover;
 function renderAll(){
   renderTxList();
-  renderIncomeList();
   renderCatBreakdown();
   renderMonthlyInsights();
   renderHero(lastLeftover);
@@ -785,42 +701,43 @@ function renderAll(){
   renderAllocation();
 }
 
-async function addExpense(){
+function updateTypeUI(){
+  const type = document.getElementById('inType').value;
+  const isExpense = type === 'expense';
+  document.getElementById('categoryRow').style.display = isExpense ? 'flex' : 'none';
+  document.getElementById('descLabel').textContent = isExpense ? 'Description' : 'Source';
+  document.getElementById('inDesc').placeholder = isExpense ? 'e.g. groceries at Save-On' : 'e.g. paycheck, freelance';
+  document.getElementById('addBtn').textContent = isExpense ? 'Add expense' : 'Add income';
+}
+
+async function addTransaction(){
+  const type = document.getElementById('inType').value;
   const amount = Number(document.getElementById('inAmount').value);
-  const category = document.getElementById('inCategory').value;
   const desc = document.getElementById('inDesc').value.trim();
   const date = document.getElementById('inDate').value || todayStr();
   if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
-  expenses.push({id:cryptoId(), date, category, desc, amount});
-  await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+
+  if(type === 'expense'){
+    const category = document.getElementById('inCategory').value;
+    expenses.push({id:cryptoId(), date, category, desc, amount});
+    await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+    showToast('Added ' + money(amount) + ' to ' + category);
+  } else {
+    income.push({id:cryptoId(), date, desc, amount});
+    await window.storage.set(K_INCOME, JSON.stringify(income));
+    showToast('Added ' + money(amount) + ' income');
+  }
+
   document.getElementById('inAmount').value = '';
   document.getElementById('inDesc').value = '';
   renderAll();
-  showToast('Added ' + money(amount) + ' to ' + category);
-}
-
-async function addIncome(){
-  const amount = Number(document.getElementById('inIncomeAmount').value);
-  const desc = document.getElementById('inIncomeDesc').value.trim();
-  const date = document.getElementById('inIncomeDate').value || todayStr();
-  if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
-  income.push({id:cryptoId(), date, desc, amount});
-  await window.storage.set(K_INCOME, JSON.stringify(income));
-  document.getElementById('inIncomeAmount').value = '';
-  document.getElementById('inIncomeDesc').value = '';
-  renderAll();
-  showToast('Added ' + money(amount) + ' income');
 }
 
 function wireEvents(){
-  document.getElementById('addBtn').addEventListener('click', addExpense);
+  document.getElementById('inType').addEventListener('change', updateTypeUI);
+  document.getElementById('addBtn').addEventListener('click', addTransaction);
   ['inAmount','inDesc'].forEach(id=>{
-    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addExpense(); });
-  });
-
-  document.getElementById('addIncomeBtn').addEventListener('click', addIncome);
-  ['inIncomeAmount','inIncomeDesc'].forEach(id=>{
-    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addIncome(); });
+    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addTransaction(); });
   });
 
   document.getElementById('toggleManage').addEventListener('click', ()=>{
@@ -828,24 +745,12 @@ function wireEvents(){
   });
   document.getElementById('addCatBtn').addEventListener('click', async ()=>{
     const name = document.getElementById('newCatName').value.trim();
-    const type = document.getElementById('newCatType').value;
     if(!name){ showToast('Name the category first'); return; }
-    categories.push({name, type});
+    categories.push(name);
     await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
     document.getElementById('newCatName').value='';
     renderCategorySelect(); renderCatChips(); renderAll();
     showToast('Category added');
-  });
-
-  document.getElementById('toggleSettings').addEventListener('click', ()=>{
-    document.getElementById('settingsBody').classList.toggle('open');
-  });
-  document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
-    settings.periodStart = document.getElementById('periodStart').value;
-    settings.periodEnd = document.getElementById('periodEnd').value;
-    await window.storage.set(K_SETTINGS, JSON.stringify(settings));
-    renderAll();
-    showToast('Settings saved');
   });
 }
 
@@ -854,9 +759,7 @@ async function init(){
   renderCategorySelect();
   renderCatChips();
   document.getElementById('inDate').value = todayStr();
-  document.getElementById('inIncomeDate').value = todayStr();
-  document.getElementById('periodStart').value = settings.periodStart;
-  document.getElementById('periodEnd').value = settings.periodEnd;
+  updateTypeUI();
   wireEvents();
   renderAll();
 }
