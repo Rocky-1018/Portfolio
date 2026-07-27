@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger — Expense Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#0F1417;
+  --panel:#171F24;
+  --panel-raised:#1D262C;
+  --line:#2A343B;
+  --ink:#E8EDF0;
+  --muted:#8A98A3;
+  --mint:#4FD1A5;
+  --mint-dim:#2B4A42;
+  --coral:#F2725A;
+  --gold:#E3B341;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Inter',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+
+/* ---- Header ---- */
+.topbar{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:8px;}
+.topbar h1{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:22px;
+  letter-spacing:0.2px;
+  margin:0;
+}
+.topbar .sub{color:var(--muted);font-size:12.5px;}
+
+/* ---- Receipt / hero card ---- */
+.receipt{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:26px 28px 22px;
+  position:relative;
+  margin-bottom:22px;
+  overflow:hidden;
+}
+.receipt::before{
+  content:"";
+  position:absolute;
+  top:0;left:0;right:0;height:3px;
+  background:repeating-linear-gradient(90deg,var(--line) 0 8px, transparent 8px 16px);
+}
+.receipt-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1.6px;
+  color:var(--muted);
+  margin-bottom:10px;
+}
+.receipt-figure{
+  font-family:'Fraunces',serif;
+  font-weight:300;
+  font-size:56px;
+  line-height:1;
+  color:var(--mint);
+  letter-spacing:-1px;
+  transition:transform .25s ease;
+}
+.receipt-figure.flash{transform:scale(1.04);}
+.receipt-figure.negative{color:var(--coral);}
+.receipt-meta{
+  display:flex;
+  gap:28px;
+  margin-top:16px;
+  flex-wrap:wrap;
+}
+.receipt-meta div{font-size:12.5px;color:var(--muted);}
+.receipt-meta b{
+  display:block;
+  font-family:'JetBrains Mono',monospace;
+  color:var(--ink);
+  font-size:15px;
+  margin-top:2px;
+}
+
+/* ---- Grid layout ---- */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:800px){.grid{grid-template-columns:1fr;}}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:20px 22px;
+}
+.card h2{
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+  color:var(--muted);
+  margin:0 0 16px;
+  font-weight:600;
+}
+
+/* ---- Quick add form ---- */
+.form-row{display:flex;gap:10px;margin-bottom:10px;}
+.field{flex:1;display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11px;color:var(--muted);}
+.field input, .field select{
+  background:var(--panel-raised);
+  border:1px solid var(--line);
+  color:var(--ink);
+  border-radius:6px;
+  padding:9px 10px;
+  font-size:14px;
+  font-family:inherit;
+  width:100%;
+}
+.field input:focus, .field select:focus{
+  outline:none;
+  border-color:var(--mint);
+}
+.amount-field input{font-family:'JetBrains Mono',monospace;}
+.add-btn{
+  width:100%;
+  margin-top:6px;
+  background:var(--mint);
+  color:#0B1512;
+  border:none;
+  border-radius:6px;
+  padding:11px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:'Inter',sans-serif;
+  transition:filter .15s ease;
+}
+.add-btn:hover{filter:brightness(1.08);}
+.add-btn:active{filter:brightness(0.95);}
+.hint{font-size:11px;color:var(--muted);margin-top:8px;}
+.manage-link{
+  background:none;border:none;color:var(--muted);
+  font-size:11.5px;text-decoration:underline;
+  cursor:pointer;padding:0;margin-top:10px;
+  font-family:inherit;
+}
+
+/* ---- Transactions list ---- */
+.tx-list{max-height:290px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+.tx-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 4px;
+  border-bottom:1px solid var(--line);
+  font-size:13px;
+}
+.tx-row:last-child{border-bottom:none;}
+.tx-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.tx-main{flex:1;min-width:0;}
+.tx-desc{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tx-sub{color:var(--muted);font-size:11px;}
+.tx-amount{font-family:'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;}
+.tx-del{
+  background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:15px;line-height:1;padding:4px 6px;
+  border-radius:4px;
+}
+.tx-del:hover{color:var(--coral);background:rgba(242,114,90,0.1);}
+.tx-empty{color:var(--muted);font-size:13px;padding:20px 0;text-align:center;}
+
+/* ---- Category bars ---- */
+.cat-row{margin-bottom:12px;}
+.cat-row-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;}
+.cat-row-top .name{color:var(--ink);}
+.cat-row-top .val{font-family:'JetBrains Mono',monospace;color:var(--muted);}
+.bar-track{height:6px;background:var(--panel-raised);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;}
+
+/* ---- Income settings ---- */
+.settings-body{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+.settings-body.open{display:block;}
+
+/* ---- Allocation ---- */
+.alloc-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
+.alloc-row .name{flex:0 0 150px;color:var(--ink);}
+.alloc-row input[type=number]{
+  width:56px;background:var(--panel-raised);border:1px solid var(--line);
+  color:var(--ink);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;
+}
+.alloc-row .amt{flex:1;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--muted);}
+
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--panel-raised);border:1px solid var(--mint);color:var(--ink);
+  padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;
+  transition:all .25s ease;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.manage-panel{margin-top:12px;display:none;}
+.manage-panel.open{display:block;}
+.manage-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;}
+.manage-row input[type=text]{flex:1;}
+.manage-row select{width:110px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--panel-raised);border:1px solid var(--line);
+  border-radius:14px;padding:4px 10px;font-size:11.5px;margin:3px 4px 0 0;
+}
+.chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <h1>Ledger</h1>
+    <div class="sub" id="periodLabel">—</div>
+  </div>
+
+  <div class="receipt">
+    <div class="receipt-label">Available to save / invest this month</div>
+    <div class="receipt-figure" id="leftoverFigure">$0.00</div>
+    <div class="receipt-meta">
+      <div>Income<b id="metaIncome">$0</b></div>
+      <div>Fixed<b id="metaFixed">$0</b></div>
+      <div>Variable<b id="metaVariable">$0</b></div>
+      <div>Total spent<b id="metaTotal">$0</b></div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2>Add an expense</h2>
+      <div class="form-row">
+        <div class="field amount-field">
+          <label>Amount (CAD)</label>
+          <input type="number" id="inAmount" placeholder="0.00" step="0.01">
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <select id="inCategory"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Description</label>
+          <input type="text" id="inDesc" placeholder="e.g. groceries at Save-On">
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label>Date</label>
+          <input type="date" id="inDate">
+        </div>
+      </div>
+      <button class="add-btn" id="addBtn">Add expense</button>
+      <div class="hint">Press Enter in any field to add instantly.</div>
+      <button class="manage-link" id="toggleManage">Manage categories</button>
+      <div class="manage-panel" id="managePanel">
+        <div class="manage-row">
+          <input type="text" id="newCatName" placeholder="New category name">
+          <select id="newCatType"><option value="Fixed">Fixed</option><option value="Variable" selected>Variable</option></select>
+          <button class="add-btn" style="width:auto;padding:8px 12px;" id="addCatBtn">Add</button>
+        </div>
+        <div id="catChips"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent expenses</h2>
+      <div class="tx-list" id="txList"></div>
+    </div>
+
+    <div class="card">
+      <h2>By category</h2>
+      <div id="catBreakdown"></div>
+    </div>
+
+    <div class="card">
+      <h2>Income & period <button class="manage-link" style="float:right;" id="toggleSettings">edit</button></h2>
+      <div id="settingsSummary" style="font-size:13px;color:var(--muted);">Biweekly pay, period range, and allocation live here.</div>
+      <div class="settings-body" id="settingsBody">
+        <div class="form-row">
+          <div class="field"><label>Biweekly pay — low</label><input type="number" id="payLow" value="1200"></div>
+          <div class="field"><label>Biweekly pay — high</label><input type="number" id="payHigh" value="1300"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Period start</label><input type="date" id="periodStart"></div>
+          <div class="field"><label>Period end</label><input type="date" id="periodEnd"></div>
+        </div>
+        <button class="add-btn" id="saveSettingsBtn">Save</button>
+
+        <h2 style="margin-top:20px;">Allocate the leftover</h2>
+        <div id="allocRows"></div>
+        <div class="hint" id="allocCheck"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvc7auhaAhbIXboJKxWoMCgELuJQxJFpnZzzt5stHXskigl3TJpXmkaXcxDqRJ4bp6Rw/exec';
+
+window.storage = {
+  async get(key){
+    const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if(data.value === null || data.value === undefined) return null;
+    return { value: data.value };
+  },
+  async set(key, value){
+    await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: value
+    });
+  }
+};
+
+const K_EXPENSES = 'expenses-v1';
+const K_CATEGORIES = 'categories-v1';
+const K_SETTINGS = 'settings-v1';
+const K_ALLOC = 'allocation-v1';
+
+const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0','#E39E5B','#8FBF6B','#D97BA8','#9AA5B1'];
+
+let expenses = [];
+let categories = [];
+let settings = { payLow:1200, payHigh:1300, periodStart:null, periodEnd:null };
+let allocation = [
+  {name:'Emergency Fund', pct:0.25},
+  {name:'TFSA investing', pct:0.40},
+  {name:'FHSA / goal', pct:0.15},
+  {name:'Remittance top-up', pct:0.10},
+  {name:'Flexible buffer', pct:0.10},
+];
+
+function money(n){
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function firstOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(),1).toISOString().slice(0,10); }
+function lastOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth()+1,0).toISOString().slice(0,10); }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+async function loadAll(){
+  try{
+    const e = await window.storage.get(K_EXPENSES);
+    expenses = e ? JSON.parse(e.value) : [];
+  }catch(err){ expenses = []; }
+
+  try{
+    const c = await window.storage.get(K_CATEGORIES);
+    categories = c ? JSON.parse(c.value) : null;
+  }catch(err){ categories = null; }
+  if(!categories){
+    categories = [
+      {name:'Rent', type:'Fixed'},
+      {name:'Transit', type:'Fixed'},
+      {name:'Food', type:'Fixed'},
+      {name:'Phone', type:'Variable'},
+      {name:'Subscriptions', type:'Variable'},
+      {name:'Personal Care', type:'Variable'},
+      {name:'Gaming/Hobbies', type:'Variable'},
+      {name:'Remittance', type:'Variable'},
+      {name:'Misc/Buffer', type:'Variable'},
+      {name:'Other', type:'Variable'},
+    ];
+    await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
+  }
+
+  try{
+    const s = await window.storage.get(K_SETTINGS);
+    if(s) settings = JSON.parse(s.value);
+  }catch(err){}
+  if(!settings.periodStart) settings.periodStart = firstOfMonth();
+  if(!settings.periodEnd) settings.periodEnd = lastOfMonth();
+
+  try{
+    const a = await window.storage.get(K_ALLOC);
+    if(a) allocation = JSON.parse(a.value);
+  }catch(err){}
+
+  // seed example expenses on very first run
+  if(expenses.length === 0){
+    const d = settings.periodStart;
+    expenses = [
+      {id:cryptoId(), date:d, category:'Rent', desc:'Monthly rent', amount:700},
+      {id:cryptoId(), date:d, category:'Transit', desc:'Monthly transit pass', amount:156},
+      {id:cryptoId(), date:d, category:'Food', desc:'Food allowance', amount:250},
+    ];
+    await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  }
+}
+
+function cryptoId(){ return 'x' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+function catType(name){
+  const c = categories.find(c=>c.name===name);
+  return c ? c.type : 'Variable';
+}
+function catColor(name){
+  const idx = categories.findIndex(c=>c.name===name);
+  return CAT_COLORS[(idx>=0?idx:0) % CAT_COLORS.length];
+}
+
+function monthlyIncome(){
+  const avg = (Number(settings.payLow)+Number(settings.payHigh))/2;
+  return avg * 26/12;
+}
+
+function inPeriod(dateStr){
+  if(!settings.periodStart && !settings.periodEnd) return true;
+  const d = new Date(dateStr);
+  if(settings.periodStart && d < new Date(settings.periodStart)) return false;
+  if(settings.periodEnd && d > new Date(settings.periodEnd)) return false;
+  return true;
+}
+
+function renderCategorySelect(){
+  const sel = document.getElementById('inCategory');
+  sel.innerHTML = categories.map(c=>`<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+function renderCatChips(){
+  const el = document.getElementById('catChips');
+  el.innerHTML = categories.map((c,i)=>`
+    <span class="chip">${c.name} · ${c.type} <button data-idx="${i}" class="chip-del">×</button></span>
+  `).join('');
+  el.querySelectorAll('.chip-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = Number(btn.dataset.idx);
+      categories.splice(idx,1);
+      await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
+      renderCategorySelect(); renderCatChips(); renderAll();
+    });
+  });
+}
+
+function renderTxList(){
+  const list = document.getElementById('txList');
+  const sorted = [...expenses].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  if(sorted.length===0){
+    list.innerHTML = '<div class="tx-empty">No expenses yet — add your first one.</div>';
+    return;
+  }
+  list.innerHTML = sorted.map(tx=>`
+    <div class="tx-row" data-id="${tx.id}">
+      <span class="tx-cat-dot" style="background:${catColor(tx.category)}"></span>
+      <div class="tx-main">
+        <div class="tx-desc">${tx.desc || tx.category}</div>
+        <div class="tx-sub">${tx.category} · ${tx.date}</div>
+      </div>
+      <div class="tx-amount">${money(tx.amount)}</div>
+      <button class="tx-del" data-id="${tx.id}">×</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.tx-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      expenses = expenses.filter(e=>e.id !== btn.dataset.id);
+      await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+      renderAll();
+      showToast('Expense removed');
+    });
+  });
+}
+
+function renderCatBreakdown(){
+  const el = document.getElementById('catBreakdown');
+  const periodExpenses = expenses.filter(e=>inPeriod(e.date));
+  const totals = {};
+  categories.forEach(c=>totals[c.name]=0);
+  periodExpenses.forEach(e=>{ totals[e.category] = (totals[e.category]||0) + Number(e.amount); });
+  const maxVal = Math.max(1, ...Object.values(totals));
+  el.innerHTML = categories.map(c=>{
+    const v = totals[c.name]||0;
+    const pct = Math.min(100, (v/maxVal)*100);
+    return `
+      <div class="cat-row">
+        <div class="cat-row-top"><span class="name">${c.name}</span><span class="val">${money(v)}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${catColor(c.name)}"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function computeTotals(){
+  const periodExpenses = expenses.filter(e=>inPeriod(e.date));
+  let fixed=0, variable=0;
+  periodExpenses.forEach(e=>{
+    if(catType(e.category)==='Fixed') fixed += Number(e.amount);
+    else variable += Number(e.amount);
+  });
+  const income = monthlyIncome();
+  const total = fixed+variable;
+  const leftover = income - total;
+  return {income, fixed, variable, total, leftover};
+}
+
+function renderHero(prevLeftover){
+  const {income, fixed, variable, total, leftover} = computeTotals();
+  const fig = document.getElementById('leftoverFigure');
+  fig.textContent = money(leftover);
+  fig.classList.toggle('negative', leftover < 0);
+  if(prevLeftover !== undefined && prevLeftover !== leftover){
+    fig.classList.add('flash');
+    setTimeout(()=>fig.classList.remove('flash'), 250);
+  }
+  document.getElementById('metaIncome').textContent = money(income);
+  document.getElementById('metaFixed').textContent = money(fixed);
+  document.getElementById('metaVariable').textContent = money(variable);
+  document.getElementById('metaTotal').textContent = money(total);
+
+  const label = document.getElementById('periodLabel');
+  label.textContent = (settings.periodStart||'') + ' → ' + (settings.periodEnd||'');
+}
+
+function renderAllocation(){
+  const {leftover} = computeTotals();
+  const el = document.getElementById('allocRows');
+  el.innerHTML = allocation.map((a,i)=>`
+    <div class="alloc-row">
+      <span class="name">${a.name}</span>
+      <input type="number" min="0" max="100" step="1" value="${Math.round(a.pct*100)}" data-idx="${i}" class="alloc-pct">
+      <span style="color:var(--muted)">%</span>
+      <span class="amt">${money(leftover*a.pct)}</span>
+    </div>
+  `).join('');
+  el.querySelectorAll('.alloc-pct').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const idx = Number(inp.dataset.idx);
+      allocation[idx].pct = Number(inp.value)/100;
+      await window.storage.set(K_ALLOC, JSON.stringify(allocation));
+      renderAllocation();
+    });
+  });
+  const totalPct = allocation.reduce((s,a)=>s+a.pct,0);
+  const checkEl = document.getElementById('allocCheck');
+  const pctRounded = Math.round(totalPct*100);
+  checkEl.textContent = pctRounded === 100 ? 'Allocations total 100% ✓' : `Allocations total ${pctRounded}% — adjust to reach 100%`;
+  checkEl.style.color = pctRounded===100 ? 'var(--mint)' : 'var(--coral)';
+}
+
+let lastLeftover;
+function renderAll(){
+  renderTxList();
+  renderCatBreakdown();
+  renderHero(lastLeftover);
+  lastLeftover = computeTotals().leftover;
+  renderAllocation();
+}
+
+async function addExpense(){
+  const amount = Number(document.getElementById('inAmount').value);
+  const category = document.getElementById('inCategory').value;
+  const desc = document.getElementById('inDesc').value.trim();
+  const date = document.getElementById('inDate').value || todayStr();
+  if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
+  expenses.push({id:cryptoId(), date, category, desc, amount});
+  await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  document.getElementById('inAmount').value = '';
+  document.getElementById('inDesc').value = '';
+  renderAll();
+  showToast('Added ' + money(amount) + ' to ' + category);
+}
+
+function wireEvents(){
+  document.getElementById('addBtn').addEventListener('click', addExpense);
+  ['inAmount','inDesc'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addExpense(); });
+  });
+
+  document.getElementById('toggleManage').addEventListener('click', ()=>{
+    document.getElementById('managePanel').classList.toggle('open');
+  });
+  document.getElementById('addCatBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('newCatName').value.trim();
+    const type = document.getElementById('newCatType').value;
+    if(!name){ showToast('Name the category first'); return; }
+    categories.push({name, type});
+    await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
+    document.getElementById('newCatName').value='';
+    renderCategorySelect(); renderCatChips(); renderAll();
+    showToast('Category added');
+  });
+
+  document.getElementById('toggleSettings').addEventListener('click', ()=>{
+    document.getElementById('settingsBody').classList.toggle('open');
+  });
+  document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
+    settings.payLow = Number(document.getElementById('payLow').value);
+    settings.payHigh = Number(document.getElementById('payHigh').value);
+    settings.periodStart = document.getElementById('periodStart').value;
+    settings.periodEnd = document.getElementById('periodEnd').value;
+    await window.storage.set(K_SETTINGS, JSON.stringify(settings));
+    renderAll();
+    showToast('Settings saved');
+  });
+}
+
+async function init(){
+  await loadAll();
+  renderCategorySelect();
+  renderCatChips();
+  document.getElementById('inDate').value = todayStr();
+  document.getElementById('payLow').value = settings.payLow;
+  document.getElementById('payHigh').value = settings.payHigh;
+  document.getElementById('periodStart').value = settings.periodStart;
+  document.getElementById('periodEnd').value = settings.periodEnd;
+  wireEvents();
+  renderAll();
+}
+init();
+</script>
+</body>
+</html>
