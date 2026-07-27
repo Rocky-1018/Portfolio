@@ -213,6 +213,19 @@ body{
 }
 .chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;}
 
+/* ---- Monthly insights ---- */
+.insights-card{grid-column:1 / -1;}
+.month-row{margin-bottom:16px;}
+.month-row:last-child{margin-bottom:0;}
+.month-row-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:8px;}
+.month-row-top .month-label{color:var(--ink);font-weight:600;}
+.month-row-top .month-leftover{font-family:'JetBrains Mono',monospace;color:var(--mint);}
+.month-row-top .month-leftover.negative{color:var(--coral);}
+.month-bar-line{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.month-bar-line .month-bar-tag{width:56px;flex-shrink:0;font-size:11px;color:var(--muted);}
+.month-bar-line .bar-track{flex:1;}
+.month-bar-line .month-bar-val{width:80px;flex-shrink:0;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+
 /* ---- Login ---- */
 .login-overlay{
   position:fixed;inset:0;background:var(--bg);
@@ -312,18 +325,41 @@ body{
     </div>
 
     <div class="card">
+      <h2>Add income</h2>
+      <div class="form-row">
+        <div class="field amount-field">
+          <label>Amount (CAD)</label>
+          <input type="number" id="inIncomeAmount" placeholder="0.00" step="0.01">
+        </div>
+        <div class="field" style="max-width:150px;">
+          <label>Date</label>
+          <input type="date" id="inIncomeDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Source</label>
+          <input type="text" id="inIncomeDesc" placeholder="e.g. paycheck, freelance">
+        </div>
+      </div>
+      <button class="add-btn" id="addIncomeBtn">Add income</button>
+      <div class="hint">Press Enter in any field to add instantly.</div>
+    </div>
+
+    <div class="card">
+      <h2>Recent income</h2>
+      <div class="tx-list" id="incomeList"></div>
+    </div>
+
+    <div class="card">
       <h2>By category</h2>
       <div id="catBreakdown"></div>
     </div>
 
     <div class="card">
-      <h2>Income & period <button class="manage-link" style="float:right;" id="toggleSettings">edit</button></h2>
-      <div id="settingsSummary" style="font-size:13px;color:var(--muted);">Biweekly pay, period range, and allocation live here.</div>
+      <h2>Period & allocation <button class="manage-link" style="float:right;" id="toggleSettings">edit</button></h2>
+      <div id="settingsSummary" style="font-size:13px;color:var(--muted);">The period range and leftover allocation live here.</div>
       <div class="settings-body" id="settingsBody">
-        <div class="form-row">
-          <div class="field"><label>Biweekly pay — low</label><input type="number" id="payLow" value="1200"></div>
-          <div class="field"><label>Biweekly pay — high</label><input type="number" id="payHigh" value="1300"></div>
-        </div>
         <div class="form-row">
           <div class="field"><label>Period start</label><input type="date" id="periodStart"></div>
           <div class="field"><label>Period end</label><input type="date" id="periodEnd"></div>
@@ -334,6 +370,11 @@ body{
         <div id="allocRows"></div>
         <div class="hint" id="allocCheck"></div>
       </div>
+    </div>
+
+    <div class="card insights-card">
+      <h2>Monthly insights</h2>
+      <div id="monthlyInsights"></div>
     </div>
 
   </div>
@@ -354,6 +395,12 @@ window.storage = {
     if(data.error === 'unauthorized'){ forceLogout(); return null; }
     if(data.value === null || data.value === undefined) return null;
     return { value: data.value };
+  },
+  async getAll(){
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=getAll&token=${encodeURIComponent(authToken)}`);
+    const data = await res.json();
+    if(data.error === 'unauthorized'){ forceLogout(); return null; }
+    return data;
   },
   async set(key, value){
     const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}&token=${encodeURIComponent(authToken)}`, {
@@ -410,6 +457,7 @@ function wireLogin(){
 }
 
 const K_EXPENSES = 'expenses-v1';
+const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
 const K_SETTINGS = 'settings-v1';
 const K_ALLOC = 'allocation-v1';
@@ -417,8 +465,9 @@ const K_ALLOC = 'allocation-v1';
 const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0','#E39E5B','#8FBF6B','#D97BA8','#9AA5B1'];
 
 let expenses = [];
+let income = [];
 let categories = [];
-let settings = { payLow:1200, payHigh:1300, periodStart:null, periodEnd:null };
+let settings = { periodStart:null, periodEnd:null };
 let allocation = [
   {name:'Emergency Fund', pct:0.25},
   {name:'TFSA investing', pct:0.40},
@@ -443,14 +492,22 @@ function showToast(msg){
 }
 
 async function loadAll(){
+  let bundle = null;
   try{
-    const e = await window.storage.get(K_EXPENSES);
-    expenses = e ? JSON.parse(e.value) : [];
+    bundle = await window.storage.getAll();
+  }catch(err){}
+  bundle = bundle || {};
+
+  try{
+    expenses = bundle.expenses ? JSON.parse(bundle.expenses) : [];
   }catch(err){ expenses = []; }
 
   try{
-    const c = await window.storage.get(K_CATEGORIES);
-    categories = c ? JSON.parse(c.value) : null;
+    income = bundle.income ? JSON.parse(bundle.income) : [];
+  }catch(err){ income = []; }
+
+  try{
+    categories = bundle.categories ? JSON.parse(bundle.categories) : null;
   }catch(err){ categories = null; }
   if(!categories){
     categories = [
@@ -469,15 +526,13 @@ async function loadAll(){
   }
 
   try{
-    const s = await window.storage.get(K_SETTINGS);
-    if(s) settings = JSON.parse(s.value);
+    if(bundle.settings) settings = JSON.parse(bundle.settings);
   }catch(err){}
   if(!settings.periodStart) settings.periodStart = firstOfMonth();
   if(!settings.periodEnd) settings.periodEnd = lastOfMonth();
 
   try{
-    const a = await window.storage.get(K_ALLOC);
-    if(a) allocation = JSON.parse(a.value);
+    if(bundle.allocation) allocation = JSON.parse(bundle.allocation);
   }catch(err){}
 
   // seed example expenses on very first run
@@ -503,9 +558,8 @@ function catColor(name){
   return CAT_COLORS[(idx>=0?idx:0) % CAT_COLORS.length];
 }
 
-function monthlyIncome(){
-  const avg = (Number(settings.payLow)+Number(settings.payHigh))/2;
-  return avg * 26/12;
+function periodIncome(){
+  return income.filter(i=>inPeriod(i.date)).reduce((s,i)=>s+Number(i.amount), 0);
 }
 
 function inPeriod(dateStr){
@@ -514,6 +568,13 @@ function inPeriod(dateStr){
   if(settings.periodStart && d < new Date(settings.periodStart)) return false;
   if(settings.periodEnd && d > new Date(settings.periodEnd)) return false;
   return true;
+}
+
+function monthKey(dateStr){ return (dateStr||'').slice(0,7); }
+function monthLabel(key){
+  const parts = key.split('-');
+  const d = new Date(Number(parts[0]), Number(parts[1])-1, 1);
+  return d.toLocaleDateString('en-CA', {month:'short', year:'numeric'});
 }
 
 function renderCategorySelect(){
@@ -564,6 +625,80 @@ function renderTxList(){
   });
 }
 
+function renderIncomeList(){
+  const list = document.getElementById('incomeList');
+  const sorted = [...income].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  if(sorted.length===0){
+    list.innerHTML = '<div class="tx-empty">No income logged yet — add your first entry.</div>';
+    return;
+  }
+  list.innerHTML = sorted.map(tx=>`
+    <div class="tx-row" data-id="${tx.id}">
+      <span class="tx-cat-dot" style="background:var(--mint)"></span>
+      <div class="tx-main">
+        <div class="tx-desc">${tx.desc || 'Income'}</div>
+        <div class="tx-sub">${tx.date}</div>
+      </div>
+      <div class="tx-amount">${money(tx.amount)}</div>
+      <button class="tx-del" data-id="${tx.id}">×</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.tx-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      income = income.filter(i=>i.id !== btn.dataset.id);
+      await window.storage.set(K_INCOME, JSON.stringify(income));
+      renderAll();
+      showToast('Income entry removed');
+    });
+  });
+}
+
+function renderMonthlyInsights(){
+  const el = document.getElementById('monthlyInsights');
+  const map = {};
+  income.forEach(i=>{
+    const k = monthKey(i.date);
+    if(!k) return;
+    map[k] = map[k] || {income:0, expense:0};
+    map[k].income += Number(i.amount);
+  });
+  expenses.forEach(e=>{
+    const k = monthKey(e.date);
+    if(!k) return;
+    map[k] = map[k] || {income:0, expense:0};
+    map[k].expense += Number(e.amount);
+  });
+  const keys = Object.keys(map).sort().reverse().slice(0,12);
+  if(keys.length===0){
+    el.innerHTML = '<div class="tx-empty">No income or expenses yet — add some to see monthly insights.</div>';
+    return;
+  }
+  const maxVal = Math.max(1, ...keys.map(k=>Math.max(map[k].income, map[k].expense)));
+  el.innerHTML = keys.map(k=>{
+    const {income:inc, expense:exp} = map[k];
+    const leftover = inc - exp;
+    const incPct = Math.min(100, (inc/maxVal)*100);
+    const expPct = Math.min(100, (exp/maxVal)*100);
+    return `
+      <div class="month-row">
+        <div class="month-row-top">
+          <span class="month-label">${monthLabel(k)}</span>
+          <span class="month-leftover ${leftover<0?'negative':''}">${money(leftover)}</span>
+        </div>
+        <div class="month-bar-line">
+          <span class="month-bar-tag">Income</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${incPct}%;background:var(--mint)"></div></div>
+          <span class="month-bar-val">${money(inc)}</span>
+        </div>
+        <div class="month-bar-line">
+          <span class="month-bar-tag">Expenses</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${expPct}%;background:var(--coral)"></div></div>
+          <span class="month-bar-val">${money(exp)}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 function renderCatBreakdown(){
   const el = document.getElementById('catBreakdown');
   const periodExpenses = expenses.filter(e=>inPeriod(e.date));
@@ -589,10 +724,10 @@ function computeTotals(){
     if(catType(e.category)==='Fixed') fixed += Number(e.amount);
     else variable += Number(e.amount);
   });
-  const income = monthlyIncome();
+  const inc = periodIncome();
   const total = fixed+variable;
-  const leftover = income - total;
-  return {income, fixed, variable, total, leftover};
+  const leftover = inc - total;
+  return {income: inc, fixed, variable, total, leftover};
 }
 
 function renderHero(prevLeftover){
@@ -642,7 +777,9 @@ function renderAllocation(){
 let lastLeftover;
 function renderAll(){
   renderTxList();
+  renderIncomeList();
   renderCatBreakdown();
+  renderMonthlyInsights();
   renderHero(lastLeftover);
   lastLeftover = computeTotals().leftover;
   renderAllocation();
@@ -662,10 +799,28 @@ async function addExpense(){
   showToast('Added ' + money(amount) + ' to ' + category);
 }
 
+async function addIncome(){
+  const amount = Number(document.getElementById('inIncomeAmount').value);
+  const desc = document.getElementById('inIncomeDesc').value.trim();
+  const date = document.getElementById('inIncomeDate').value || todayStr();
+  if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
+  income.push({id:cryptoId(), date, desc, amount});
+  await window.storage.set(K_INCOME, JSON.stringify(income));
+  document.getElementById('inIncomeAmount').value = '';
+  document.getElementById('inIncomeDesc').value = '';
+  renderAll();
+  showToast('Added ' + money(amount) + ' income');
+}
+
 function wireEvents(){
   document.getElementById('addBtn').addEventListener('click', addExpense);
   ['inAmount','inDesc'].forEach(id=>{
     document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addExpense(); });
+  });
+
+  document.getElementById('addIncomeBtn').addEventListener('click', addIncome);
+  ['inIncomeAmount','inIncomeDesc'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addIncome(); });
   });
 
   document.getElementById('toggleManage').addEventListener('click', ()=>{
@@ -686,8 +841,6 @@ function wireEvents(){
     document.getElementById('settingsBody').classList.toggle('open');
   });
   document.getElementById('saveSettingsBtn').addEventListener('click', async ()=>{
-    settings.payLow = Number(document.getElementById('payLow').value);
-    settings.payHigh = Number(document.getElementById('payHigh').value);
     settings.periodStart = document.getElementById('periodStart').value;
     settings.periodEnd = document.getElementById('periodEnd').value;
     await window.storage.set(K_SETTINGS, JSON.stringify(settings));
@@ -701,8 +854,7 @@ async function init(){
   renderCategorySelect();
   renderCatChips();
   document.getElementById('inDate').value = todayStr();
-  document.getElementById('payLow').value = settings.payLow;
-  document.getElementById('payHigh').value = settings.payHigh;
+  document.getElementById('inIncomeDate').value = todayStr();
   document.getElementById('periodStart').value = settings.periodStart;
   document.getElementById('periodEnd').value = settings.periodEnd;
   wireEvents();
