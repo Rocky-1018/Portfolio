@@ -17,6 +17,18 @@
   --mint-dim:#2B4A42;
   --coral:#F2725A;
   --gold:#E3B341;
+  --chart-income:#2FA37A;
+  --chart-expense:#D9573D;
+  --chart-leftover:#3987E5;
+  --chart-other:#8A98A3;
+  --chart-1:#3987E5;
+  --chart-2:#D95926;
+  --chart-3:#199E70;
+  --chart-4:#C98500;
+  --chart-5:#D55181;
+  --chart-6:#008300;
+  --chart-7:#9085E9;
+  --chart-8:#E66767;
 }
 *{box-sizing:border-box;}
 body{
@@ -174,13 +186,30 @@ body{
 .tx-del:hover{color:var(--coral);background:rgba(242,114,90,0.1);}
 .tx-empty{color:var(--muted);font-size:13px;padding:20px 0;text-align:center;}
 
-/* ---- Category bars ---- */
-.cat-row{margin-bottom:12px;}
-.cat-row-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;}
-.cat-row-top .name{color:var(--ink);}
-.cat-row-top .val{font-family:'JetBrains Mono',monospace;color:var(--muted);}
-.bar-track{height:6px;background:var(--panel-raised);border-radius:3px;overflow:hidden;}
-.bar-fill{height:100%;border-radius:3px;}
+/* ---- Donut chart (By category) ---- */
+.donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap;}
+.donut-svg{flex-shrink:0;}
+.donut-slice{cursor:pointer;transition:opacity .12s ease;}
+.donut-slice.dim{opacity:0.35;}
+.donut-center-total{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;fill:var(--ink);}
+.donut-center-label{font-size:9.5px;fill:var(--muted);letter-spacing:0.4px;}
+.donut-legend{flex:1;min-width:180px;display:flex;flex-direction:column;gap:9px;}
+.donut-legend-row{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;}
+.donut-legend-swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.donut-legend-name{color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.donut-legend-pct{color:var(--muted);font-size:11px;width:36px;text-align:right;flex-shrink:0;}
+.donut-legend-val{font-family:'JetBrains Mono',monospace;color:var(--muted);width:70px;text-align:right;flex-shrink:0;}
+.donut-legend-row.dim{opacity:0.4;}
+
+/* ---- Chart tooltip ---- */
+.viz-tooltip{
+  position:fixed;background:var(--panel-raised);border:1px solid var(--line);
+  border-radius:6px;padding:7px 10px;font-size:11.5px;pointer-events:none;
+  z-index:2000;opacity:0;transition:opacity .1s ease;white-space:nowrap;
+}
+.viz-tooltip.show{opacity:1;}
+.viz-tooltip .tt-value{color:var(--ink);font-weight:700;font-family:'JetBrains Mono',monospace;display:block;font-size:13px;}
+.viz-tooltip .tt-label{color:var(--muted);}
 
 /* ---- Allocation ---- */
 .alloc-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
@@ -210,18 +239,19 @@ body{
 }
 .chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;}
 
-/* ---- Monthly insights ---- */
-.insights-card{grid-column:1 / -1;}
-.month-row{margin-bottom:16px;}
-.month-row:last-child{margin-bottom:0;}
-.month-row-top{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:8px;}
-.month-row-top .month-label{color:var(--ink);font-weight:600;}
-.month-row-top .month-leftover{font-family:'JetBrains Mono',monospace;color:var(--mint);}
-.month-row-top .month-leftover.negative{color:var(--coral);}
-.month-bar-line{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
-.month-bar-line .month-bar-tag{width:56px;flex-shrink:0;font-size:11px;color:var(--muted);}
-.month-bar-line .bar-track{flex:1;}
-.month-bar-line .month-bar-val{width:80px;flex-shrink:0;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+/* ---- Monthly insights chart ---- */
+.insights-card{grid-column:1 / -1;min-width:0;}
+.insights-legend{display:flex;gap:18px;margin-bottom:14px;flex-wrap:wrap;}
+.insights-legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+.insights-legend-swatch{width:11px;height:11px;border-radius:3px;flex-shrink:0;}
+.insights-legend-swatch.line{width:14px;height:2px;border-radius:1px;}
+.insights-chart-scroll{overflow-x:auto;}
+.chart-bar{cursor:pointer;}
+.chart-bar-group:hover .chart-bar{opacity:0.85;}
+.chart-axis-label{font-size:10px;fill:var(--muted);}
+.chart-grid-line{stroke:var(--line);stroke-width:1;}
+.chart-value-label{font-size:10px;fill:var(--muted);font-family:'JetBrains Mono',monospace;}
+.chart-dot{cursor:pointer;}
 
 /* ---- Login ---- */
 .login-overlay{
@@ -357,6 +387,7 @@ body{
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="viz-tooltip" id="vizTooltip"></div>
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvc7auhaAhbIXboJKxWoMCgELuJQxJFpnZzzt5stHXskigl3TJpXmkaXcxDqRJ4bp6Rw/exec';
@@ -438,7 +469,12 @@ const K_CATEGORIES = 'categories-v1';
 const K_ALLOC = 'allocation-v1';
 const K_RECURRING = 'recurring-v1';
 
-const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0','#E39E5B','#8FBF6B','#D97BA8','#9AA5B1'];
+const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
+const CHART_INCOME = '#2FA37A';
+const CHART_EXPENSE = '#D9573D';
+const CHART_LEFTOVER = '#3987E5';
+const CHART_OTHER = '#8A98A3';
+const CHART_PANEL = '#171F24';
 
 let expenses = [];
 let income = [];
@@ -456,6 +492,18 @@ function money(n){
   const sign = n < 0 ? '-' : '';
   return sign + '$' + Math.abs(n).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
+function moneyShort(n){
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.round(Math.abs(n)).toLocaleString('en-CA');
+}
+// SVG path for a bar with rounded top corners and a square baseline
+function roundedTopBarPath(x, w, baseline, barH, r){
+  const yTop = baseline - barH;
+  if(barH <= 0.5) return `M ${x} ${baseline} L ${x+w} ${baseline}`;
+  const rr = Math.min(r, w/2, barH);
+  if(rr <= 0.5) return `M ${x} ${baseline} L ${x} ${yTop} L ${x+w} ${yTop} L ${x+w} ${baseline} Z`;
+  return `M ${x} ${baseline} L ${x} ${yTop+rr} Q ${x} ${yTop} ${x+rr} ${yTop} L ${x+w-rr} ${yTop} Q ${x+w} ${yTop} ${x+w} ${yTop+rr} L ${x+w} ${baseline} Z`;
+}
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function firstOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(),1).toISOString().slice(0,10); }
 
@@ -464,6 +512,32 @@ function showToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 1600);
+}
+
+function showTooltip(evt, label, value){
+  const tip = document.getElementById('vizTooltip');
+  tip.innerHTML = '';
+  const valueEl = document.createElement('span');
+  valueEl.className = 'tt-value';
+  valueEl.textContent = value;
+  const labelEl = document.createElement('span');
+  labelEl.className = 'tt-label';
+  labelEl.textContent = label;
+  tip.appendChild(valueEl);
+  tip.appendChild(labelEl);
+  tip.classList.add('show');
+  moveTooltip(evt);
+}
+function moveTooltip(evt){
+  const tip = document.getElementById('vizTooltip');
+  const x = evt.clientX, y = evt.clientY;
+  const offX = x > window.innerWidth - 160 ? -170 : 14;
+  const offY = y > window.innerHeight - 80 ? -50 : 14;
+  tip.style.left = (x + offX) + 'px';
+  tip.style.top = (y + offY) + 'px';
+}
+function hideTooltip(){
+  document.getElementById('vizTooltip').classList.remove('show');
 }
 
 async function loadAll(){
@@ -646,53 +720,181 @@ function renderMonthlyInsights(){
     map[k] = map[k] || {income:0, expense:0};
     map[k].expense += Number(e.amount);
   });
-  const keys = Object.keys(map).sort().reverse().slice(0,12);
+
+  const keys = Object.keys(map).sort().slice(-6);
   if(keys.length===0){
     el.innerHTML = '<div class="tx-empty">No income or expenses yet — add some to see monthly insights.</div>';
     return;
   }
-  const maxVal = Math.max(1, ...keys.map(k=>Math.max(map[k].income, map[k].expense)));
-  el.innerHTML = keys.map(k=>{
-    const {income:inc, expense:exp} = map[k];
-    const leftover = inc - exp;
-    const incPct = Math.min(100, (inc/maxVal)*100);
-    const expPct = Math.min(100, (exp/maxVal)*100);
-    return `
-      <div class="month-row">
-        <div class="month-row-top">
-          <span class="month-label">${monthLabel(k)}</span>
-          <span class="month-leftover ${leftover<0?'negative':''}">${money(leftover)}</span>
-        </div>
-        <div class="month-bar-line">
-          <span class="month-bar-tag">Income</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${incPct}%;background:var(--mint)"></div></div>
-          <span class="month-bar-val">${money(inc)}</span>
-        </div>
-        <div class="month-bar-line">
-          <span class="month-bar-tag">Expenses</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${expPct}%;background:var(--coral)"></div></div>
-          <span class="month-bar-val">${money(exp)}</span>
-        </div>
-      </div>`;
-  }).join('');
+
+  const rows = keys.map(k=>({
+    key: k,
+    label: monthLabel(k),
+    income: map[k].income,
+    expense: map[k].expense,
+    leftover: map[k].income - map[k].expense,
+  }));
+
+  const maxVal = Math.max(1, ...rows.map(r=>Math.max(r.income, r.expense, r.leftover)));
+  const minVal = Math.min(0, ...rows.map(r=>r.leftover));
+  const domain = Math.max(1, maxVal - minVal);
+
+  const PAD_TOP = 14, PLOT_H = 180, PAD_BOTTOM = 26, PAD_LEFT = 56, GROUP_W = 84;
+  const width = PAD_LEFT + rows.length * GROUP_W + 54;
+  const height = PAD_TOP + PLOT_H + PAD_BOTTOM;
+  const yScale = v => PAD_TOP + PLOT_H * (1 - (v - minVal) / domain);
+  const zeroY = yScale(0);
+
+  const rawStep = domain / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+  const norm = rawStep / mag;
+  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  const step = niceNorm * mag;
+  const ticks = [];
+  for(let t = Math.ceil(minVal/step)*step; t <= maxVal + 0.001; t += step) ticks.push(Math.round(t));
+  if(!ticks.includes(0) && minVal <= 0 && maxVal >= 0) ticks.push(0);
+
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+  ticks.forEach(tv=>{
+    const y = yScale(tv);
+    svg += `<line class="chart-grid-line" x1="${PAD_LEFT}" y1="${y}" x2="${width-10}" y2="${y}"/>`;
+    svg += `<text class="chart-axis-label" x="${PAD_LEFT-8}" y="${y+3}" text-anchor="end">${moneyShort(tv)}</text>`;
+  });
+
+  const barW = 20, barGap = 4, pairW = barW*2 + barGap;
+  const linePoints = [];
+
+  rows.forEach((r,i)=>{
+    const groupCenter = PAD_LEFT + i*GROUP_W + GROUP_W/2;
+    const incX = groupCenter - pairW/2;
+    const expX = incX + barW + barGap;
+    const incH = zeroY - yScale(r.income);
+    const expH = zeroY - yScale(r.expense);
+
+    svg += `<g class="chart-bar-group">
+      <path class="chart-bar" data-i="${i}" data-series="income" fill="${CHART_INCOME}" d="${roundedTopBarPath(incX, barW, zeroY, incH, 4)}"/>
+      <path class="chart-bar" data-i="${i}" data-series="expense" fill="${CHART_EXPENSE}" d="${roundedTopBarPath(expX, barW, zeroY, expH, 4)}"/>
+    </g>`;
+    svg += `<text class="chart-axis-label" x="${groupCenter}" y="${height-8}" text-anchor="middle">${r.label}</text>`;
+
+    linePoints.push({x:groupCenter, y:yScale(r.leftover)});
+  });
+
+  if(linePoints.length > 1){
+    const pathD = linePoints.map((p,i)=> (i===0?'M':'L') + p.x + ' ' + p.y).join(' ');
+    svg += `<path d="${pathD}" fill="none" stroke="${CHART_LEFTOVER}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  linePoints.forEach((p,i)=>{
+    svg += `<circle class="chart-dot" data-i="${i}" cx="${p.x}" cy="${p.y}" r="4" fill="${CHART_LEFTOVER}" stroke="${CHART_PANEL}" stroke-width="2"/>`;
+  });
+
+  const last = rows[rows.length-1];
+  const lastCenter = PAD_LEFT + (rows.length-1)*GROUP_W + GROUP_W/2;
+  const lastDotY = yScale(last.leftover);
+  svg += `<text class="chart-value-label" x="${lastCenter + pairW/2 + 10}" y="${lastDotY+4}" text-anchor="start" fill="${CHART_LEFTOVER}">${moneyShort(last.leftover)}</text>`;
+
+  svg += `</svg>`;
+
+  el.innerHTML = `
+    <div class="insights-legend">
+      <span class="insights-legend-item"><span class="insights-legend-swatch" style="background:${CHART_INCOME}"></span>Income</span>
+      <span class="insights-legend-item"><span class="insights-legend-swatch" style="background:${CHART_EXPENSE}"></span>Expenses</span>
+      <span class="insights-legend-item"><span class="insights-legend-swatch line" style="background:${CHART_LEFTOVER}"></span>Leftover</span>
+    </div>
+    <div class="insights-chart-scroll">${svg}</div>`;
+
+  el.querySelectorAll('.chart-bar').forEach(bar=>{
+    const i = Number(bar.dataset.i);
+    const series = bar.dataset.series;
+    const r = rows[i];
+    const val = series==='income' ? r.income : r.expense;
+    bar.addEventListener('pointerenter', ev=> showTooltip(ev, r.label + ' · ' + (series==='income'?'Income':'Expenses'), money(val)));
+    bar.addEventListener('pointermove', moveTooltip);
+    bar.addEventListener('pointerleave', hideTooltip);
+  });
+  el.querySelectorAll('.chart-dot').forEach(dot=>{
+    const i = Number(dot.dataset.i);
+    const r = rows[i];
+    dot.addEventListener('pointerenter', ev=> showTooltip(ev, r.label + ' · Leftover', money(r.leftover)));
+    dot.addEventListener('pointermove', moveTooltip);
+    dot.addEventListener('pointerleave', hideTooltip);
+  });
 }
 
 function renderCatBreakdown(){
   const el = document.getElementById('catBreakdown');
   const monthExpenses = expenses.filter(e=>isThisMonth(e.date));
-  const totals = {};
-  categories.forEach(name=>totals[name]=0);
-  monthExpenses.forEach(e=>{ totals[e.category] = (totals[e.category]||0) + Number(e.amount); });
-  const maxVal = Math.max(1, ...Object.values(totals));
-  el.innerHTML = categories.map(name=>{
-    const v = totals[name]||0;
-    const pct = Math.min(100, (v/maxVal)*100);
+  const totalsMap = {};
+  monthExpenses.forEach(e=>{ totalsMap[e.category] = (totalsMap[e.category]||0) + Number(e.amount); });
+
+  let entries = Object.keys(totalsMap)
+    .filter(name=>totalsMap[name] > 0)
+    .map(name=>({name, amount:totalsMap[name], color:catColor(name)}))
+    .sort((a,b)=> b.amount - a.amount);
+
+  if(entries.length === 0){
+    el.innerHTML = '<div class="tx-empty">No expenses this month yet.</div>';
+    return;
+  }
+
+  if(entries.length > 6){
+    const top = entries.slice(0,5);
+    const restTotal = entries.slice(5).reduce((s,e)=>s+e.amount,0);
+    entries = [...top, {name:'Other', amount:restTotal, color:CHART_OTHER}];
+  }
+
+  const total = entries.reduce((s,e)=>s+e.amount,0);
+  const R = 62, CX = 85, CY = 85, SW = 20, GAP = 3;
+  const circumference = 2 * Math.PI * R;
+  let cumulative = 0;
+
+  const slices = entries.map((e,i)=>{
+    const frac = e.amount / total;
+    const segLen = Math.max(0, frac * circumference - GAP);
+    const dashOffset = -cumulative;
+    cumulative += frac * circumference;
+    return `<circle class="donut-slice" data-idx="${i}" cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${e.color}" stroke-width="${SW}" stroke-dasharray="${segLen} ${circumference-segLen}" stroke-dashoffset="${dashOffset}"/>`;
+  }).join('');
+
+  const svg = `
+    <svg class="donut-svg" width="170" height="170" viewBox="0 0 170 170">
+      <g transform="rotate(-90 ${CX} ${CY})">${slices}</g>
+      <text class="donut-center-total" x="${CX}" y="${CY-2}" text-anchor="middle">${moneyShort(total)}</text>
+      <text class="donut-center-label" x="${CX}" y="${CY+14}" text-anchor="middle">spent this month</text>
+    </svg>`;
+
+  const legend = entries.map((e,i)=>{
+    const pct = Math.round((e.amount/total)*100);
     return `
-      <div class="cat-row">
-        <div class="cat-row-top"><span class="name">${name}</span><span class="val">${money(v)}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${catColor(name)}"></div></div>
+      <div class="donut-legend-row" data-idx="${i}">
+        <span class="donut-legend-swatch" style="background:${e.color}"></span>
+        <span class="donut-legend-name">${e.name}</span>
+        <span class="donut-legend-pct">${pct}%</span>
+        <span class="donut-legend-val">${money(e.amount)}</span>
       </div>`;
   }).join('');
+
+  el.innerHTML = `<div class="donut-wrap">${svg}<div class="donut-legend">${legend}</div></div>`;
+
+  const sliceEls = el.querySelectorAll('.donut-slice');
+  const legendEls = el.querySelectorAll('.donut-legend-row');
+  function setDim(idx){
+    sliceEls.forEach(s=> s.classList.toggle('dim', idx!==null && Number(s.dataset.idx)!==idx));
+    legendEls.forEach(l=> l.classList.toggle('dim', idx!==null && Number(l.dataset.idx)!==idx));
+  }
+  function wireHover(elList){
+    elList.forEach(node=>{
+      const idx = Number(node.dataset.idx);
+      const e = entries[idx];
+      const pct = Math.round((e.amount/total)*100);
+      node.addEventListener('pointerenter', ev=>{ setDim(idx); showTooltip(ev, e.name, money(e.amount) + ' · ' + pct + '%'); });
+      node.addEventListener('pointermove', moveTooltip);
+      node.addEventListener('pointerleave', ()=>{ setDim(null); hideTooltip(); });
+    });
+  }
+  wireHover(sliceEls);
+  wireHover(legendEls);
 }
 
 function computeTotals(){
