@@ -376,6 +376,10 @@ body{
       <h2>Allocate the leftover</h2>
       <div id="allocRows"></div>
       <div class="hint" id="allocCheck"></div>
+      <div class="manage-row" style="margin-top:14px;">
+        <input type="text" id="newAllocName" placeholder="New allocation name">
+        <button class="add-btn" style="width:auto;padding:8px 12px;" id="addAllocBtn">Add</button>
+      </div>
     </div>
 
     <div class="card insights-card">
@@ -480,13 +484,7 @@ let expenses = [];
 let income = [];
 let categories = [];
 let recurring = [];
-let allocation = [
-  {name:'Emergency Fund', pct:0.25},
-  {name:'TFSA investing', pct:0.40},
-  {name:'FHSA / goal', pct:0.15},
-  {name:'Remittance top-up', pct:0.10},
-  {name:'Flexible buffer', pct:0.10},
-];
+let allocation = [];
 
 function money(n){
   const sign = n < 0 ? '-' : '';
@@ -539,8 +537,6 @@ function hideTooltip(){
   document.getElementById('vizTooltip').classList.remove('show');
 }
 
-const DEFAULT_CATEGORIES = ['Rent','Transit','Food','Phone','Subscriptions','Personal Care','Gaming/Hobbies','Remittance','Misc/Buffer','Other'];
-
 async function loadAll(){
   let bundle = null;
   let fetchOk = true;
@@ -561,13 +557,6 @@ async function loadAll(){
   try{
     categories = bundle.categories ? JSON.parse(bundle.categories) : [];
   }catch(err){ categories = []; }
-  if(categories.length === 0){
-    categories = DEFAULT_CATEGORIES;
-    // only persist defaults when we're sure this is a real first run, never
-    // after a failed/timed-out fetch — writing here previously wiped real
-    // data whenever a transient request came back empty
-    if(fetchOk) await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
-  }
 
   try{
     if(bundle.allocation) allocation = JSON.parse(bundle.allocation);
@@ -924,12 +913,21 @@ function renderHero(prevLeftover){
 function renderAllocation(){
   const {leftover} = computeTotals();
   const el = document.getElementById('allocRows');
+  const checkEl = document.getElementById('allocCheck');
+
+  if(allocation.length === 0){
+    el.innerHTML = '<div class="tx-empty">No allocations yet — add one below.</div>';
+    checkEl.textContent = '';
+    return;
+  }
+
   el.innerHTML = allocation.map((a,i)=>`
     <div class="alloc-row">
       <span class="name">${a.name}</span>
       <input type="number" min="0" max="100" step="1" value="${Math.round(a.pct*100)}" data-idx="${i}" class="alloc-pct">
       <span style="color:var(--muted)">%</span>
       <span class="amt">${money(leftover*a.pct)}</span>
+      <button class="tx-del alloc-del" data-idx="${i}">×</button>
     </div>
   `).join('');
   el.querySelectorAll('.alloc-pct').forEach(inp=>{
@@ -940,8 +938,16 @@ function renderAllocation(){
       renderAllocation();
     });
   });
+  el.querySelectorAll('.alloc-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = Number(btn.dataset.idx);
+      allocation.splice(idx,1);
+      await window.storage.set(K_ALLOC, JSON.stringify(allocation));
+      renderAllocation();
+      showToast('Allocation removed');
+    });
+  });
   const totalPct = allocation.reduce((s,a)=>s+a.pct,0);
-  const checkEl = document.getElementById('allocCheck');
   const pctRounded = Math.round(totalPct*100);
   checkEl.textContent = pctRounded === 100 ? 'Allocations total 100% ✓' : `Allocations total ${pctRounded}% — adjust to reach 100%`;
   checkEl.style.color = pctRounded===100 ? 'var(--mint)' : 'var(--coral)';
@@ -976,6 +982,7 @@ async function addTransaction(){
 
   if(type === 'expense'){
     const category = document.getElementById('inCategory').value;
+    if(!category){ showToast('Add a category first'); return; }
     const isRecurring = document.getElementById('inRecurring').checked;
     if(isRecurring){
       const template = {id:cryptoId(), category, desc, amount, lastGeneratedMonth: monthKey(date)};
@@ -1024,6 +1031,19 @@ function wireEvents(){
 
   document.getElementById('toggleRecurringManage').addEventListener('click', ()=>{
     document.getElementById('recurringPanel').classList.toggle('open');
+  });
+
+  document.getElementById('addAllocBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('newAllocName').value.trim();
+    if(!name){ showToast('Name the allocation first'); return; }
+    allocation.push({name, pct:0});
+    await window.storage.set(K_ALLOC, JSON.stringify(allocation));
+    document.getElementById('newAllocName').value = '';
+    renderAllocation();
+    showToast('Allocation added');
+  });
+  document.getElementById('newAllocName').addEventListener('keydown', e=>{
+    if(e.key==='Enter') document.getElementById('addAllocBtn').click();
   });
 }
 
