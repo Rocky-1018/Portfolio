@@ -50,6 +50,15 @@ body{
   margin:0;
 }
 .topbar .sub{color:var(--muted);font-size:12.5px;}
+.month-nav{display:flex;align-items:center;gap:10px;}
+.month-nav-btn{
+  background:var(--panel-raised);border:1px solid var(--line);color:var(--ink);
+  width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:15px;
+  line-height:1;display:flex;align-items:center;justify-content:center;
+  font-family:inherit;
+}
+.month-nav-btn:hover{border-color:var(--mint);color:var(--mint);}
+.month-nav .sub{min-width:112px;text-align:center;}
 
 /* ---- Receipt / hero card ---- */
 .receipt{
@@ -292,14 +301,17 @@ body{
 
   <div class="topbar">
     <h1>Ledger</h1>
-    <div style="display:flex;align-items:center;gap:14px;">
+    <div class="month-nav">
+      <button class="month-nav-btn" id="prevMonthBtn" aria-label="Previous month">‹</button>
       <div class="sub" id="periodLabel">—</div>
+      <button class="month-nav-btn" id="nextMonthBtn" aria-label="Next month">›</button>
+      <button class="manage-link" id="jumpTodayBtn" style="display:none;">this month</button>
       <button class="manage-link" id="logoutBtn">log out</button>
     </div>
   </div>
 
   <div class="receipt">
-    <div class="receipt-label">Available to save / invest this month</div>
+    <div class="receipt-label">Available to save / invest</div>
     <div class="receipt-figure" id="leftoverFigure">$0.00</div>
     <div class="receipt-meta">
       <div>Income<b id="metaIncome">$0</b></div>
@@ -485,6 +497,7 @@ let income = [];
 let categories = [];
 let recurring = [];
 let allocation = [];
+let selectedMonth = monthKey(todayStr());
 
 function money(n){
   const sign = n < 0 ? '-' : '';
@@ -597,11 +610,9 @@ function catColor(name){
   return CAT_COLORS[(idx>=0?idx:0) % CAT_COLORS.length];
 }
 
-function isThisMonth(dateStr){
+function isSelectedMonth(dateStr){
   if(!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  return monthKey(dateStr) === selectedMonth;
 }
 
 function monthKey(dateStr){ return (dateStr||'').slice(0,7); }
@@ -609,6 +620,16 @@ function monthLabel(key){
   const parts = key.split('-');
   const d = new Date(Number(parts[0]), Number(parts[1])-1, 1);
   return d.toLocaleDateString('en-CA', {month:'short', year:'numeric'});
+}
+function monthLabelLong(key){
+  const parts = key.split('-');
+  const d = new Date(Number(parts[0]), Number(parts[1])-1, 1);
+  return d.toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+}
+function shiftMonth(key, delta){
+  const parts = key.split('-');
+  const d = new Date(Number(parts[0]), Number(parts[1])-1+delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
 
 function renderCategorySelect(){
@@ -653,11 +674,11 @@ function renderRecurringChips(){
 
 function renderTxList(){
   const list = document.getElementById('txList');
-  const expRows = expenses.filter(e=>isThisMonth(e.date)).map(e=>({...e, kind:'expense'}));
-  const incRows = income.filter(i=>isThisMonth(i.date)).map(i=>({...i, kind:'income'}));
+  const expRows = expenses.filter(e=>isSelectedMonth(e.date)).map(e=>({...e, kind:'expense'}));
+  const incRows = income.filter(i=>isSelectedMonth(i.date)).map(i=>({...i, kind:'income'}));
   const combined = [...expRows, ...incRows].sort((a,b)=> b.date.localeCompare(a.date) || 0);
   if(combined.length===0){
-    list.innerHTML = '<div class="tx-empty">No transactions this month yet.</div>';
+    list.innerHTML = `<div class="tx-empty">No transactions in ${monthLabelLong(selectedMonth)} yet.</div>`;
     return;
   }
   list.innerHTML = combined.map(tx=>{
@@ -812,7 +833,7 @@ function renderMonthlyInsights(){
 
 function renderCatBreakdown(){
   const el = document.getElementById('catBreakdown');
-  const monthExpenses = expenses.filter(e=>isThisMonth(e.date));
+  const monthExpenses = expenses.filter(e=>isSelectedMonth(e.date));
   const totalsMap = {};
   monthExpenses.forEach(e=>{ totalsMap[e.category] = (totalsMap[e.category]||0) + Number(e.amount); });
 
@@ -822,7 +843,7 @@ function renderCatBreakdown(){
     .sort((a,b)=> b.amount - a.amount);
 
   if(entries.length === 0){
-    el.innerHTML = '<div class="tx-empty">No expenses this month yet.</div>';
+    el.innerHTML = `<div class="tx-empty">No expenses in ${monthLabelLong(selectedMonth)} yet.</div>`;
     return;
   }
 
@@ -886,8 +907,8 @@ function renderCatBreakdown(){
 }
 
 function computeTotals(){
-  const monthExpenses = expenses.filter(e=>isThisMonth(e.date));
-  const monthIncome = income.filter(i=>isThisMonth(i.date));
+  const monthExpenses = expenses.filter(e=>isSelectedMonth(e.date));
+  const monthIncome = income.filter(i=>isSelectedMonth(i.date));
   const expenseTotal = monthExpenses.reduce((s,e)=>s+Number(e.amount), 0);
   const incomeTotal = monthIncome.reduce((s,i)=>s+Number(i.amount), 0);
   const leftover = incomeTotal - expenseTotal;
@@ -907,7 +928,10 @@ function renderHero(prevLeftover){
   document.getElementById('metaExpense').textContent = money(expense);
 
   const label = document.getElementById('periodLabel');
-  label.textContent = new Date().toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+  label.textContent = monthLabelLong(selectedMonth);
+
+  const isCurrent = selectedMonth === monthKey(todayStr());
+  document.getElementById('jumpTodayBtn').style.display = isCurrent ? 'none' : 'inline';
 }
 
 function renderAllocation(){
@@ -1044,6 +1068,19 @@ function wireEvents(){
   });
   document.getElementById('newAllocName').addEventListener('keydown', e=>{
     if(e.key==='Enter') document.getElementById('addAllocBtn').click();
+  });
+
+  document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
+    selectedMonth = shiftMonth(selectedMonth, -1);
+    renderAll();
+  });
+  document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
+    selectedMonth = shiftMonth(selectedMonth, 1);
+    renderAll();
+  });
+  document.getElementById('jumpTodayBtn').addEventListener('click', ()=>{
+    selectedMonth = monthKey(todayStr());
+    renderAll();
   });
 }
 
