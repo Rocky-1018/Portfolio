@@ -310,6 +310,12 @@ body{
           <input type="date" id="inDate">
         </div>
       </div>
+      <div class="form-row" id="recurringRow">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;">
+          <input type="checkbox" id="inRecurring" style="width:auto;">
+          Repeat every month (fixed expense)
+        </label>
+      </div>
       <button class="add-btn" id="addBtn">Add expense</button>
       <div class="hint">Press Enter in any field to add instantly.</div>
       <button class="manage-link" id="toggleManage">Manage categories</button>
@@ -319,6 +325,10 @@ body{
           <button class="add-btn" style="width:auto;padding:8px 12px;" id="addCatBtn">Add</button>
         </div>
         <div id="catChips"></div>
+      </div>
+      <button class="manage-link" id="toggleRecurringManage">Manage fixed expenses</button>
+      <div class="manage-panel" id="recurringPanel">
+        <div id="recurringChips"></div>
       </div>
     </div>
 
@@ -426,12 +436,14 @@ const K_EXPENSES = 'expenses-v1';
 const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
 const K_ALLOC = 'allocation-v1';
+const K_RECURRING = 'recurring-v1';
 
 const CAT_COLORS = ['#4FD1A5','#E3B341','#7EA6E0','#F2725A','#C48CD9','#5FC7C0','#E39E5B','#8FBF6B','#D97BA8','#9AA5B1'];
 
 let expenses = [];
 let income = [];
 let categories = [];
+let recurring = [];
 let allocation = [
   {name:'Emergency Fund', pct:0.25},
   {name:'TFSA investing', pct:0.40},
@@ -481,6 +493,10 @@ async function loadAll(){
     if(bundle.allocation) allocation = JSON.parse(bundle.allocation);
   }catch(err){}
 
+  try{
+    recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
+  }catch(err){ recurring = []; }
+
   // seed example expenses on very first run
   if(expenses.length === 0){
     const d = firstOfMonth();
@@ -491,6 +507,25 @@ async function loadAll(){
     ];
     await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
   }
+}
+
+// creates this month's occurrence of each fixed expense the first time the app
+// is opened in a new calendar month; a deleted occurrence won't reappear until
+// the following month, since lastGeneratedMonth is only updated once per cycle
+async function applyRecurring(){
+  const cm = monthKey(todayStr());
+  let expensesChanged = false;
+  let recurringChanged = false;
+  recurring.forEach(t=>{
+    if(t.lastGeneratedMonth !== cm){
+      expenses.push({id:cryptoId(), date:todayStr(), category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
+      t.lastGeneratedMonth = cm;
+      expensesChanged = true;
+      recurringChanged = true;
+    }
+  });
+  if(expensesChanged) await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  if(recurringChanged) await window.storage.set(K_RECURRING, JSON.stringify(recurring));
 }
 
 function cryptoId(){ return 'x' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
@@ -534,6 +569,26 @@ function renderCatChips(){
   });
 }
 
+function renderRecurringChips(){
+  const el = document.getElementById('recurringChips');
+  if(recurring.length===0){
+    el.innerHTML = '<div class="tx-empty">No fixed expenses yet.</div>';
+    return;
+  }
+  el.innerHTML = recurring.map((t,i)=>`
+    <span class="chip">${t.category} · ${t.desc || t.category} · ${money(t.amount)} <button data-idx="${i}" class="chip-del">×</button></span>
+  `).join('');
+  el.querySelectorAll('.chip-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = Number(btn.dataset.idx);
+      recurring.splice(idx,1);
+      await window.storage.set(K_RECURRING, JSON.stringify(recurring));
+      renderRecurringChips();
+      showToast('Fixed expense removed — it will stop repeating');
+    });
+  });
+}
+
 function renderTxList(){
   const list = document.getElementById('txList');
   const expRows = expenses.filter(e=>isThisMonth(e.date)).map(e=>({...e, kind:'expense'}));
@@ -546,7 +601,7 @@ function renderTxList(){
   list.innerHTML = combined.map(tx=>{
     const isExpense = tx.kind==='expense';
     const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
-    const sub = isExpense ? `${tx.category} · ${tx.date}` : tx.date;
+    const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''} · ${tx.date}` : tx.date;
     const desc = tx.desc || (isExpense ? tx.category : 'Income');
     const sign = isExpense ? '-' : '+';
     return `
@@ -705,6 +760,7 @@ function updateTypeUI(){
   const type = document.getElementById('inType').value;
   const isExpense = type === 'expense';
   document.getElementById('categoryRow').style.display = isExpense ? 'flex' : 'none';
+  document.getElementById('recurringRow').style.display = isExpense ? 'flex' : 'none';
   document.getElementById('descLabel').textContent = isExpense ? 'Description' : 'Source';
   document.getElementById('inDesc').placeholder = isExpense ? 'e.g. groceries at Save-On' : 'e.g. paycheck, freelance';
   document.getElementById('addBtn').textContent = isExpense ? 'Add expense' : 'Add income';
@@ -719,9 +775,21 @@ async function addTransaction(){
 
   if(type === 'expense'){
     const category = document.getElementById('inCategory').value;
-    expenses.push({id:cryptoId(), date, category, desc, amount});
-    await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
-    showToast('Added ' + money(amount) + ' to ' + category);
+    const isRecurring = document.getElementById('inRecurring').checked;
+    if(isRecurring){
+      const template = {id:cryptoId(), category, desc, amount, lastGeneratedMonth: monthKey(date)};
+      recurring.push(template);
+      await window.storage.set(K_RECURRING, JSON.stringify(recurring));
+      expenses.push({id:cryptoId(), date, category, desc, amount, recurringId:template.id});
+      await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+      renderRecurringChips();
+      showToast('Added ' + money(amount) + ' fixed expense — repeats monthly');
+      document.getElementById('inRecurring').checked = false;
+    } else {
+      expenses.push({id:cryptoId(), date, category, desc, amount});
+      await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+      showToast('Added ' + money(amount) + ' to ' + category);
+    }
   } else {
     income.push({id:cryptoId(), date, desc, amount});
     await window.storage.set(K_INCOME, JSON.stringify(income));
@@ -752,12 +820,18 @@ function wireEvents(){
     renderCategorySelect(); renderCatChips(); renderAll();
     showToast('Category added');
   });
+
+  document.getElementById('toggleRecurringManage').addEventListener('click', ()=>{
+    document.getElementById('recurringPanel').classList.toggle('open');
+  });
 }
 
 async function init(){
   await loadAll();
+  await applyRecurring();
   renderCategorySelect();
   renderCatChips();
+  renderRecurringChips();
   document.getElementById('inDate').value = todayStr();
   updateTypeUI();
   wireEvents();
