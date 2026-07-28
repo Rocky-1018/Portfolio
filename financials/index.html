@@ -505,7 +505,6 @@ function roundedTopBarPath(x, w, baseline, barH, r){
   return `M ${x} ${baseline} L ${x} ${yTop+rr} Q ${x} ${yTop} ${x+rr} ${yTop} L ${x+w-rr} ${yTop} Q ${x+w} ${yTop} ${x+w} ${yTop+rr} L ${x+w} ${baseline} Z`;
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
-function firstOfMonth(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(),1).toISOString().slice(0,10); }
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -540,11 +539,15 @@ function hideTooltip(){
   document.getElementById('vizTooltip').classList.remove('show');
 }
 
+const DEFAULT_CATEGORIES = ['Rent','Transit','Food','Phone','Subscriptions','Personal Care','Gaming/Hobbies','Remittance','Misc/Buffer','Other'];
+
 async function loadAll(){
   let bundle = null;
+  let fetchOk = true;
   try{
     bundle = await window.storage.getAll();
-  }catch(err){}
+  }catch(err){ fetchOk = false; }
+  if(!bundle) fetchOk = false;
   bundle = bundle || {};
 
   try{
@@ -556,11 +559,14 @@ async function loadAll(){
   }catch(err){ income = []; }
 
   try{
-    categories = bundle.categories ? JSON.parse(bundle.categories) : null;
-  }catch(err){ categories = null; }
-  if(!categories || categories.length === 0){
-    categories = ['Rent','Transit','Food','Phone','Subscriptions','Personal Care','Gaming/Hobbies','Remittance','Misc/Buffer','Other'];
-    await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
+    categories = bundle.categories ? JSON.parse(bundle.categories) : [];
+  }catch(err){ categories = []; }
+  if(categories.length === 0){
+    categories = DEFAULT_CATEGORIES;
+    // only persist defaults when we're sure this is a real first run, never
+    // after a failed/timed-out fetch — writing here previously wiped real
+    // data whenever a transient request came back empty
+    if(fetchOk) await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
   }
 
   try{
@@ -571,15 +577,8 @@ async function loadAll(){
     recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
   }catch(err){ recurring = []; }
 
-  // seed example expenses on very first run
-  if(expenses.length === 0){
-    const d = firstOfMonth();
-    expenses = [
-      {id:cryptoId(), date:d, category:'Rent', desc:'Monthly rent', amount:700},
-      {id:cryptoId(), date:d, category:'Transit', desc:'Monthly transit pass', amount:156},
-      {id:cryptoId(), date:d, category:'Food', desc:'Food allowance', amount:250},
-    ];
-    await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  if(!fetchOk){
+    showToast('Could not load your saved data — check your connection and reload.');
   }
 }
 
