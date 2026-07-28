@@ -195,6 +195,18 @@ body{
 }
 .tx-del:hover{color:var(--coral);background:rgba(242,114,90,0.1);}
 .tx-empty{color:var(--muted);font-size:13px;padding:20px 0;text-align:center;}
+.tx-date-header{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:14px 4px 5px;font-size:11px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.tx-list .tx-date-header:first-child{padding-top:2px;}
+.tx-date-header span:last-child{
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;
+  text-transform:none;letter-spacing:0;font-weight:700;
+}
+.tx-date-header .expense{color:var(--coral);}
+.tx-date-header .income{color:var(--mint);}
 
 /* ---- Donut chart (By category) ---- */
 .donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap;}
@@ -352,44 +364,8 @@ body{
   <div class="grid">
 
     <div class="card">
-      <h2>Add transaction</h2>
-      <div class="form-row">
-        <div class="field">
-          <label>Type</label>
-          <select id="inType">
-            <option value="expense" selected>Expense</option>
-            <option value="income">Income</option>
-          </select>
-        </div>
-        <div class="field amount-field">
-          <label>Amount (CAD)</label>
-          <input type="number" id="inAmount" placeholder="0.00" step="0.01">
-        </div>
-      </div>
-      <div class="form-row" id="categoryRow">
-        <div class="field">
-          <label>Category</label>
-          <select id="inCategory"></select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="field">
-          <label id="descLabel">Description</label>
-          <input type="text" id="inDesc" placeholder="e.g. groceries at Save-On">
-        </div>
-        <div class="field" style="max-width:150px;">
-          <label>Date</label>
-          <input type="date" id="inDate">
-        </div>
-      </div>
-      <div class="form-row" id="recurringRow">
-        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;">
-          <input type="checkbox" id="inRecurring" style="width:auto;">
-          Repeat every month (fixed expense)
-        </label>
-      </div>
-      <button class="add-btn" id="addBtn">Add expense</button>
-      <div class="hint">Press Enter in any field to add instantly.</div>
+      <h2>Categories & fixed expenses</h2>
+      <div class="hint" style="margin-top:0;">Add transactions from the calendar below. Manage your categories and recurring fixed expenses here.</div>
       <button class="manage-link" id="toggleManage">Manage categories</button>
       <div class="manage-panel" id="managePanel">
         <div class="manage-row">
@@ -676,11 +652,6 @@ function daysInMonthOf(key){
   return new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
 }
 
-function renderCategorySelect(){
-  const sel = document.getElementById('inCategory');
-  sel.innerHTML = categories.map(name=>`<option value="${name}">${name}</option>`).join('');
-}
-
 function renderCatChips(){
   const el = document.getElementById('catChips');
   el.innerHTML = categories.map((name,i)=>`
@@ -691,7 +662,7 @@ function renderCatChips(){
       const idx = Number(btn.dataset.idx);
       categories.splice(idx,1);
       await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
-      renderCategorySelect(); renderCatChips(); renderAll();
+      renderCatChips(); renderAll();
     });
   });
 }
@@ -720,28 +691,49 @@ function renderTxList(){
   const list = document.getElementById('txList');
   const expRows = expenses.filter(e=>isSelectedMonth(e.date)).map(e=>({...e, kind:'expense'}));
   const incRows = income.filter(i=>isSelectedMonth(i.date)).map(i=>({...i, kind:'income'}));
-  const combined = [...expRows, ...incRows].sort((a,b)=> b.date.localeCompare(a.date) || 0);
+  const combined = [...expRows, ...incRows];
   if(combined.length===0){
     list.innerHTML = `<div class="tx-empty">No transactions in ${monthLabelLong(selectedMonth)} yet.</div>`;
     return;
   }
-  list.innerHTML = combined.map(tx=>{
-    const isExpense = tx.kind==='expense';
-    const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
-    const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''} · ${tx.date}` : tx.date;
-    const desc = tx.desc || (isExpense ? tx.category : 'Income');
-    const sign = isExpense ? '-' : '+';
+
+  const groups = {};
+  combined.forEach(tx=>{ (groups[tx.date] = groups[tx.date] || []).push(tx); });
+  const dates = Object.keys(groups).sort().reverse();
+
+  list.innerHTML = dates.map(date=>{
+    const txs = groups[date].sort((a,b)=> a.kind==='income' ? -1 : 1);
+    const dayNet = txs.reduce((s,tx)=> s + (tx.kind==='income' ? tx.amount : -tx.amount), 0);
+    const dateLabel = new Date(date+'T00:00:00').toLocaleDateString('en-CA', {weekday:'short', month:'short', day:'numeric'});
+    const netClass = dayNet < 0 ? 'expense' : 'income';
+    const netSign = dayNet < 0 ? '-' : '+';
+
+    const rows = txs.map(tx=>{
+      const isExpense = tx.kind==='expense';
+      const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
+      const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''}` : 'Income';
+      const desc = tx.desc || (isExpense ? tx.category : 'Income');
+      const sign = isExpense ? '-' : '+';
+      return `
+      <div class="tx-row" data-id="${tx.id}">
+        <span class="tx-cat-dot" style="background:${dot}"></span>
+        <div class="tx-main">
+          <div class="tx-desc">${desc}</div>
+          <div class="tx-sub">${sub}</div>
+        </div>
+        <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
+        <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
+      </div>`;
+    }).join('');
+
     return `
-    <div class="tx-row" data-id="${tx.id}">
-      <span class="tx-cat-dot" style="background:${dot}"></span>
-      <div class="tx-main">
-        <div class="tx-desc">${desc}</div>
-        <div class="tx-sub">${sub}</div>
+      <div class="tx-date-header">
+        <span>${dateLabel}</span>
+        <span class="${netClass}">${netSign}${money(Math.abs(dayNet))}</span>
       </div>
-      <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
-      <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
-    </div>`;
+      ${rows}`;
   }).join('');
+
   list.querySelectorAll('.tx-del').forEach(btn=>{
     btn.addEventListener('click', ()=> deleteTx(btn.dataset.kind, btn.dataset.id));
   });
@@ -1183,17 +1175,7 @@ function renderAll(){
   renderAllocation();
 }
 
-function updateTypeUI(){
-  const type = document.getElementById('inType').value;
-  const isExpense = type === 'expense';
-  document.getElementById('categoryRow').style.display = isExpense ? 'flex' : 'none';
-  document.getElementById('recurringRow').style.display = isExpense ? 'flex' : 'none';
-  document.getElementById('descLabel').textContent = isExpense ? 'Description' : 'Source';
-  document.getElementById('inDesc').placeholder = isExpense ? 'e.g. groceries at Save-On' : 'e.g. paycheck, freelance';
-  document.getElementById('addBtn').textContent = isExpense ? 'Add expense' : 'Add income';
-}
-
-// shared by the main "Add transaction" form and the calendar day panel
+// used by the calendar day panel to add expenses/income
 async function submitTransaction({type, amount, category, desc, date, isRecurring}){
   if(!amount || amount<=0){ showToast('Enter an amount first'); return false; }
 
@@ -1223,29 +1205,7 @@ async function submitTransaction({type, amount, category, desc, date, isRecurrin
   return true;
 }
 
-async function addTransaction(){
-  const type = document.getElementById('inType').value;
-  const amount = Number(document.getElementById('inAmount').value);
-  const category = document.getElementById('inCategory').value;
-  const desc = document.getElementById('inDesc').value.trim();
-  const date = document.getElementById('inDate').value || todayStr();
-  const isRecurring = document.getElementById('inRecurring').checked;
-
-  const ok = await submitTransaction({type, amount, category, desc, date, isRecurring});
-  if(ok){
-    document.getElementById('inAmount').value = '';
-    document.getElementById('inDesc').value = '';
-    document.getElementById('inRecurring').checked = false;
-  }
-}
-
 function wireEvents(){
-  document.getElementById('inType').addEventListener('change', updateTypeUI);
-  document.getElementById('addBtn').addEventListener('click', addTransaction);
-  ['inAmount','inDesc'].forEach(id=>{
-    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') addTransaction(); });
-  });
-
   document.getElementById('toggleManage').addEventListener('click', ()=>{
     document.getElementById('managePanel').classList.toggle('open');
   });
@@ -1255,7 +1215,7 @@ function wireEvents(){
     categories.push(name);
     await window.storage.set(K_CATEGORIES, JSON.stringify(categories));
     document.getElementById('newCatName').value='';
-    renderCategorySelect(); renderCatChips(); renderAll();
+    renderCatChips(); renderAll();
     showToast('Category added');
   });
 
@@ -1296,11 +1256,8 @@ function wireEvents(){
 async function init(){
   await loadAll();
   await applyRecurring();
-  renderCategorySelect();
   renderCatChips();
   renderRecurringChips();
-  document.getElementById('inDate').value = todayStr();
-  updateTypeUI();
   wireEvents();
   renderAll();
 }
