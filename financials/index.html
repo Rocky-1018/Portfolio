@@ -118,6 +118,7 @@ body{
   border:1px solid var(--line);
   border-radius:10px;
   padding:20px 22px;
+  min-width:0;
 }
 .card h2{
   font-size:13px;
@@ -262,6 +263,35 @@ body{
 .chart-value-label{font-size:10px;fill:var(--muted);font-family:'JetBrains Mono',monospace;}
 .chart-dot{cursor:pointer;}
 
+/* ---- Calendar ---- */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px;}
+.cal-weekday{font-size:10px;color:var(--muted);text-align:center;padding:4px 0;text-transform:uppercase;letter-spacing:0.5px;}
+.cal-day{
+  background:var(--panel-raised);border:1px solid var(--line);border-radius:6px;
+  min-height:74px;min-width:0;padding:5px;cursor:pointer;display:flex;flex-direction:column;gap:2px;
+  transition:border-color .12s ease;
+}
+.cal-day:hover{border-color:var(--mint);}
+.cal-day.empty{background:transparent;border-color:transparent;cursor:default;}
+.cal-day.today{border-color:var(--gold);}
+.cal-day.selected{border-color:var(--mint);box-shadow:0 0 0 1px var(--mint);}
+.cal-day-num{font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.cal-day.today .cal-day-num{color:var(--gold);font-weight:700;}
+.cal-day-pills{display:flex;flex-direction:column;gap:2px;overflow:hidden;flex:1;}
+.cal-pill{
+  font-size:9.5px;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-family:'JetBrains Mono',monospace;
+}
+.cal-pill.expense{background:rgba(217,87,61,0.18);color:var(--coral);}
+.cal-pill.income{background:rgba(47,163,122,0.18);color:var(--mint);}
+.cal-day-more{font-size:9.5px;color:var(--muted);}
+.cal-panel{border-top:1px solid var(--line);padding-top:16px;}
+.cal-panel-header{font-family:'Fraunces',serif;font-size:15px;margin-bottom:10px;}
+@media(max-width:640px){
+  .cal-day{min-height:52px;padding:3px;}
+  .cal-pill{font-size:8.5px;}
+}
+
 /* ---- Login ---- */
 .login-overlay{
   position:fixed;inset:0;background:var(--bg);
@@ -377,6 +407,12 @@ body{
     <div class="card">
       <h2>Transactions this month</h2>
       <div class="tx-list" id="txList"></div>
+    </div>
+
+    <div class="card insights-card">
+      <h2>Calendar</h2>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-panel" id="calDayPanel"></div>
     </div>
 
     <div class="card">
@@ -498,6 +534,7 @@ let categories = [];
 let recurring = [];
 let allocation = [];
 let selectedMonth = monthKey(todayStr());
+let selectedCalDay = null;
 
 function money(n){
   const sign = n < 0 ? '-' : '';
@@ -589,11 +626,14 @@ async function loadAll(){
 // the following month, since lastGeneratedMonth is only updated once per cycle
 async function applyRecurring(){
   const cm = monthKey(todayStr());
+  const dim = daysInMonthOf(cm);
   let expensesChanged = false;
   let recurringChanged = false;
   recurring.forEach(t=>{
     if(t.lastGeneratedMonth !== cm){
-      expenses.push({id:cryptoId(), date:todayStr(), category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
+      const day = Math.min(Math.max(Number(t.day)||1, 1), dim);
+      const date = cm + '-' + String(day).padStart(2,'0');
+      expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
       t.lastGeneratedMonth = cm;
       expensesChanged = true;
       recurringChanged = true;
@@ -631,6 +671,10 @@ function shiftMonth(key, delta){
   const d = new Date(Number(parts[0]), Number(parts[1])-1+delta, 1);
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
 }
+function daysInMonthOf(key){
+  const parts = key.split('-');
+  return new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
+}
 
 function renderCategorySelect(){
   const sel = document.getElementById('inCategory');
@@ -659,7 +703,7 @@ function renderRecurringChips(){
     return;
   }
   el.innerHTML = recurring.map((t,i)=>`
-    <span class="chip">${t.category} · ${t.desc || t.category} · ${money(t.amount)} <button data-idx="${i}" class="chip-del">×</button></span>
+    <span class="chip">${t.category} · ${t.desc || t.category} · ${money(t.amount)} · day ${t.day||1} <button data-idx="${i}" class="chip-del">×</button></span>
   `).join('');
   el.querySelectorAll('.chip-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -699,17 +743,168 @@ function renderTxList(){
     </div>`;
   }).join('');
   list.querySelectorAll('.tx-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const kind = btn.dataset.kind;
-      if(kind==='expense'){
-        expenses = expenses.filter(e=>e.id !== btn.dataset.id);
-        await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
-      } else {
-        income = income.filter(i=>i.id !== btn.dataset.id);
-        await window.storage.set(K_INCOME, JSON.stringify(income));
-      }
-      renderAll();
-      showToast('Removed');
+    btn.addEventListener('click', ()=> deleteTx(btn.dataset.kind, btn.dataset.id));
+  });
+}
+
+async function deleteTx(kind, id){
+  if(kind==='expense'){
+    expenses = expenses.filter(e=>e.id !== id);
+    await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  } else {
+    income = income.filter(i=>i.id !== id);
+    await window.storage.set(K_INCOME, JSON.stringify(income));
+  }
+  renderAll();
+  showToast('Removed');
+}
+
+function renderCalendar(){
+  const grid = document.getElementById('calGrid');
+  const [y, m] = selectedMonth.split('-').map(Number);
+  const startWeekday = new Date(y, m-1, 1).getDay();
+  const dim = daysInMonthOf(selectedMonth);
+
+  const dayTx = {};
+  expenses.filter(e=>isSelectedMonth(e.date)).forEach(e=>{
+    const day = Number(e.date.slice(8,10));
+    (dayTx[day] = dayTx[day] || []).push({...e, kind:'expense'});
+  });
+  income.filter(i=>isSelectedMonth(i.date)).forEach(i=>{
+    const day = Number(i.date.slice(8,10));
+    (dayTx[day] = dayTx[day] || []).push({...i, kind:'income'});
+  });
+
+  const today = todayStr();
+  const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = weekdays.map(w=>`<div class="cal-weekday">${w}</div>`).join('');
+
+  for(let i=0; i<startWeekday; i++) html += '<div class="cal-day empty"></div>';
+
+  for(let d=1; d<=dim; d++){
+    const dateStr = selectedMonth + '-' + String(d).padStart(2,'0');
+    const txs = (dayTx[d]||[]).sort((a,b)=> a.kind==='income' ? -1 : 1);
+    const shown = txs.slice(0,2);
+    const extra = txs.length - shown.length;
+    const pills = shown.map(tx=>{
+      const label = (tx.kind==='income' ? '+' : '-') + moneyShort(tx.amount);
+      return `<div class="cal-pill ${tx.kind}">${label}</div>`;
+    }).join('');
+    const classes = ['cal-day'];
+    if(dateStr === today) classes.push('today');
+    if(dateStr === selectedCalDay) classes.push('selected');
+    html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-day-pills">${pills}${extra>0 ? `<div class="cal-day-more">+${extra} more</div>` : ''}</div>
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+  grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      selectedCalDay = cell.dataset.date;
+      renderCalendar();
+    });
+  });
+
+  renderCalDayPanel();
+}
+
+function renderCalDayPanel(){
+  const el = document.getElementById('calDayPanel');
+  if(!selectedCalDay){
+    el.innerHTML = '<div class="hint">Click a day above to view or add a transaction.</div>';
+    return;
+  }
+
+  const dayTxs = [
+    ...expenses.filter(e=>e.date===selectedCalDay).map(e=>({...e, kind:'expense'})),
+    ...income.filter(i=>i.date===selectedCalDay).map(i=>({...i, kind:'income'})),
+  ].sort((a,b)=> a.kind==='income' ? -1 : 1);
+
+  const label = new Date(selectedCalDay + 'T00:00:00').toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'});
+
+  const listHtml = dayTxs.length===0
+    ? '<div class="tx-empty">Nothing on this day yet.</div>'
+    : dayTxs.map(tx=>{
+        const isExpense = tx.kind==='expense';
+        const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
+        const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''}` : 'Income';
+        const desc = tx.desc || (isExpense ? tx.category : 'Income');
+        const sign = isExpense ? '-' : '+';
+        return `<div class="tx-row" data-id="${tx.id}">
+          <span class="tx-cat-dot" style="background:${dot}"></span>
+          <div class="tx-main"><div class="tx-desc">${desc}</div><div class="tx-sub">${sub}</div></div>
+          <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
+          <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
+        </div>`;
+      }).join('');
+
+  el.innerHTML = `
+    <div class="cal-panel-header">${label}</div>
+    <div class="tx-list" style="max-height:180px;margin-bottom:14px;">${listHtml}</div>
+    <div class="form-row">
+      <div class="field">
+        <label>Type</label>
+        <select id="calType">
+          <option value="expense" selected>Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div class="field amount-field">
+        <label>Amount (CAD)</label>
+        <input type="number" id="calAmount" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="form-row" id="calCategoryRow">
+      <div class="field">
+        <label>Category</label>
+        <select id="calCategory">${categories.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label id="calDescLabel">Description</label>
+        <input type="text" id="calDesc" placeholder="e.g. groceries">
+      </div>
+    </div>
+    <div class="form-row" id="calRecurringRow">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="calRecurring" style="width:auto;">
+        Repeat every month (fixed expense)
+      </label>
+    </div>
+    <button class="add-btn" id="calAddBtn">Add expense</button>
+  `;
+
+  el.querySelectorAll('.tx-del').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteTx(btn.dataset.kind, btn.dataset.id));
+  });
+
+  const calType = document.getElementById('calType');
+  function updateCalTypeUI(){
+    const isExpense = calType.value === 'expense';
+    document.getElementById('calCategoryRow').style.display = isExpense ? 'flex' : 'none';
+    document.getElementById('calRecurringRow').style.display = isExpense ? 'flex' : 'none';
+    document.getElementById('calDescLabel').textContent = isExpense ? 'Description' : 'Source';
+    document.getElementById('calAddBtn').textContent = isExpense ? 'Add expense' : 'Add income';
+  }
+  calType.addEventListener('change', updateCalTypeUI);
+  updateCalTypeUI();
+
+  document.getElementById('calAddBtn').addEventListener('click', ()=>{
+    submitTransaction({
+      type: calType.value,
+      amount: Number(document.getElementById('calAmount').value),
+      category: document.getElementById('calCategory').value,
+      desc: document.getElementById('calDesc').value.trim(),
+      date: selectedCalDay,
+      isRecurring: document.getElementById('calRecurring').checked,
+    });
+  });
+  ['calAmount','calDesc'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{
+      if(e.key==='Enter') document.getElementById('calAddBtn').click();
     });
   });
 }
@@ -980,6 +1175,7 @@ function renderAllocation(){
 let lastLeftover;
 function renderAll(){
   renderTxList();
+  renderCalendar();
   renderCatBreakdown();
   renderMonthlyInsights();
   renderHero(lastLeftover);
@@ -997,26 +1193,21 @@ function updateTypeUI(){
   document.getElementById('addBtn').textContent = isExpense ? 'Add expense' : 'Add income';
 }
 
-async function addTransaction(){
-  const type = document.getElementById('inType').value;
-  const amount = Number(document.getElementById('inAmount').value);
-  const desc = document.getElementById('inDesc').value.trim();
-  const date = document.getElementById('inDate').value || todayStr();
-  if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
+// shared by the main "Add transaction" form and the calendar day panel
+async function submitTransaction({type, amount, category, desc, date, isRecurring}){
+  if(!amount || amount<=0){ showToast('Enter an amount first'); return false; }
 
   if(type === 'expense'){
-    const category = document.getElementById('inCategory').value;
-    if(!category){ showToast('Add a category first'); return; }
-    const isRecurring = document.getElementById('inRecurring').checked;
+    if(!category){ showToast('Add a category first'); return false; }
     if(isRecurring){
-      const template = {id:cryptoId(), category, desc, amount, lastGeneratedMonth: monthKey(date)};
+      const day = Number(date.slice(8,10));
+      const template = {id:cryptoId(), category, desc, amount, day, lastGeneratedMonth: monthKey(date)};
       recurring.push(template);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
       expenses.push({id:cryptoId(), date, category, desc, amount, recurringId:template.id});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       renderRecurringChips();
       showToast('Added ' + money(amount) + ' fixed expense — repeats monthly');
-      document.getElementById('inRecurring').checked = false;
     } else {
       expenses.push({id:cryptoId(), date, category, desc, amount});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
@@ -1028,9 +1219,24 @@ async function addTransaction(){
     showToast('Added ' + money(amount) + ' income');
   }
 
-  document.getElementById('inAmount').value = '';
-  document.getElementById('inDesc').value = '';
   renderAll();
+  return true;
+}
+
+async function addTransaction(){
+  const type = document.getElementById('inType').value;
+  const amount = Number(document.getElementById('inAmount').value);
+  const category = document.getElementById('inCategory').value;
+  const desc = document.getElementById('inDesc').value.trim();
+  const date = document.getElementById('inDate').value || todayStr();
+  const isRecurring = document.getElementById('inRecurring').checked;
+
+  const ok = await submitTransaction({type, amount, category, desc, date, isRecurring});
+  if(ok){
+    document.getElementById('inAmount').value = '';
+    document.getElementById('inDesc').value = '';
+    document.getElementById('inRecurring').checked = false;
+  }
 }
 
 function wireEvents(){
@@ -1072,14 +1278,17 @@ function wireEvents(){
 
   document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
     selectedMonth = shiftMonth(selectedMonth, -1);
+    selectedCalDay = null;
     renderAll();
   });
   document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
     selectedMonth = shiftMonth(selectedMonth, 1);
+    selectedCalDay = null;
     renderAll();
   });
   document.getElementById('jumpTodayBtn').addEventListener('click', ()=>{
     selectedMonth = monthKey(todayStr());
+    selectedCalDay = null;
     renderAll();
   });
 }
