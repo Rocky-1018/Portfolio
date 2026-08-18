@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#0F1417;
+  --panel:#171F24;
+  --panel-raised:#1D262C;
+  --line:#2A343B;
+  --ink:#E8EDF0;
+  --muted:#8A98A3;
+  --mint:#4FD1A5;
+  --coral:#F2725A;
+  --gold:#E3B341;
+}
+*{box-sizing:border-box;}
+html,body{
+  margin:0;height:100%;overflow:hidden;
+  background:var(--bg);color:var(--ink);
+  font-family:'Inter',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- Login ---- */
+.login-overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;
+}
+.login-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:48px 44px;width:100%;max-width:460px;
+}
+.login-card h1{font-family:'Fraunces',serif;font-weight:500;font-size:32px;margin:0 0 8px;}
+.login-card p{color:var(--muted);font-size:16px;margin:0 0 28px;}
+.login-card .field{margin-bottom:20px;display:flex;flex-direction:column;gap:8px;}
+.login-card label{font-size:14px;color:var(--muted);}
+.login-card input{
+  background:var(--panel-raised);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:14px 16px;font-size:18px;font-family:inherit;width:100%;
+}
+.login-card input:focus{outline:none;border-color:var(--mint);}
+.login-btn{
+  width:100%;margin-top:6px;background:var(--mint);color:#0B1512;border:none;
+  border-radius:8px;padding:16px;font-size:18px;font-weight:700;cursor:pointer;
+  font-family:'Inter',sans-serif;
+}
+.login-btn:hover{filter:brightness(1.08);}
+.login-error{color:var(--coral);font-size:15px;margin-top:14px;min-height:20px;}
+
+/* ---- Dashboard shell ---- */
+.dash{
+  display:none;
+  height:100vh;width:100vw;
+  padding:2.2vh 2.2vw;
+  flex-direction:column;
+  gap:1.8vh;
+}
+.dash-top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:1vh;}
+.dash-top h1{
+  font-family:'Fraunces',serif;font-weight:500;font-size:clamp(20px,2.4vw,34px);
+  margin:0;letter-spacing:0.3px;
+}
+.dash-datetime{text-align:right;}
+.dash-clock{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:clamp(28px,4.4vw,64px);line-height:1;color:var(--mint);
+}
+.dash-date{color:var(--muted);font-size:clamp(13px,1.4vw,20px);margin-top:4px;}
+
+.dash-main{flex:1;display:flex;gap:1.8vw;min-height:0;}
+
+/* ---- Calendar ---- */
+.dash-cal{
+  flex:2.15;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:1.6vw;display:flex;flex-direction:column;min-height:0;min-width:0;
+}
+.dash-cal-title{
+  font-family:'Fraunces',serif;font-size:clamp(16px,1.7vw,26px);font-weight:500;
+  margin-bottom:1vh;flex-shrink:0;
+}
+.dash-cal-grid{
+  flex:1;display:grid;grid-template-columns:repeat(7,1fr);
+  grid-template-rows:auto repeat(6,1fr);gap:6px;min-height:0;
+}
+.dash-weekday{
+  font-size:clamp(10px,0.85vw,15px);color:var(--muted);text-align:center;
+  text-transform:uppercase;letter-spacing:0.6px;padding-bottom:4px;
+}
+.dash-day{
+  background:var(--panel-raised);border:1px solid var(--line);border-radius:8px;
+  padding:0.5vh 0.6vw;display:flex;flex-direction:column;gap:2px;min-width:0;min-height:0;overflow:hidden;
+}
+.dash-day.empty{background:transparent;border-color:transparent;}
+.dash-day.today{border-color:var(--gold);border-width:2px;background:rgba(227,179,65,0.08);}
+.dash-day-num{
+  font-family:'JetBrains Mono',monospace;font-size:clamp(11px,1.05vw,17px);color:var(--muted);
+  flex-shrink:0;
+}
+.dash-day.today .dash-day-num{color:var(--gold);font-weight:700;}
+.dash-day-events{display:flex;flex-direction:column;gap:2px;overflow:hidden;flex:1;min-height:0;}
+.dash-evt{
+  font-size:clamp(9px,0.78vw,13px);padding:1px 5px;border-radius:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:rgba(79,209,165,0.16);color:var(--mint);line-height:1.5;
+}
+.dash-day-more{font-size:clamp(9px,0.7vw,12px);color:var(--muted);}
+
+/* ---- Agenda sidebar ---- */
+.dash-agenda{
+  flex:1;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:1.6vw;display:flex;flex-direction:column;gap:2vh;min-height:0;min-width:0;overflow:hidden;
+}
+.dash-agenda-section{display:flex;flex-direction:column;min-height:0;}
+.dash-agenda-section.today{flex:1.5;}
+.dash-agenda-section.tomorrow{flex:1;}
+.dash-agenda-h{
+  font-size:clamp(11px,1vw,16px);text-transform:uppercase;letter-spacing:1px;
+  color:var(--muted);margin-bottom:1vh;flex-shrink:0;font-weight:600;
+}
+.dash-agenda-list{overflow:hidden;display:flex;flex-direction:column;gap:1vh;}
+.dash-agenda-row{display:flex;gap:12px;align-items:baseline;}
+.dash-agenda-time{
+  font-family:'JetBrains Mono',monospace;color:var(--mint);flex-shrink:0;
+  font-size:clamp(12px,1.1vw,19px);width:7em;white-space:nowrap;
+}
+.dash-agenda-title{
+  font-size:clamp(13px,1.2vw,21px);color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.dash-empty{color:var(--muted);font-size:clamp(12px,1.1vw,18px);}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <h1>Dashboard</h1>
+    <p>Sign in to continue.</p>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="loginUser" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="dash" id="dash">
+  <div class="dash-top">
+    <h1>Dashboard</h1>
+    <div class="dash-datetime">
+      <div class="dash-clock" id="clock">--:--</div>
+      <div class="dash-date" id="dateLabel">—</div>
+    </div>
+  </div>
+
+  <div class="dash-main">
+    <div class="dash-cal">
+      <div class="dash-cal-title" id="calTitle">—</div>
+      <div class="dash-cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="dash-agenda">
+      <div class="dash-agenda-section today">
+        <div class="dash-agenda-h">Today</div>
+        <div class="dash-agenda-list" id="todayList"></div>
+      </div>
+      <div class="dash-agenda-section tomorrow">
+        <div class="dash-agenda-h">Tomorrow</div>
+        <div class="dash-agenda-list" id="tomorrowList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvc7auhaAhbIXboJKxWoMCgELuJQxJFpnZzzt5stHXskigl3TJpXmkaXcxDqRJ4bp6Rw/exec';
+const K_TOKEN = 'ledger-auth-token';
+const REFRESH_MS = 5 * 60 * 1000;
+
+let authToken = localStorage.getItem(K_TOKEN) || '';
+let events = [];
+
+function forceLogout(){
+  localStorage.removeItem(K_TOKEN);
+  authToken = '';
+  document.getElementById('dash').style.display = 'none';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginError').textContent = 'Session expired — sign in again.';
+}
+
+async function attemptLogin(){
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!username || !password){ errEl.textContent = 'Enter a username and password.'; return; }
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if(data.ok && data.token){
+      authToken = data.token;
+      localStorage.setItem(K_TOKEN, authToken);
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('dash').style.display = 'flex';
+      start();
+    } else {
+      errEl.textContent = 'Incorrect username or password.';
+    }
+  }catch(err){
+    errEl.textContent = 'Could not reach the server. Try again.';
+  }
+}
+
+function wireLogin(){
+  document.getElementById('loginBtn').addEventListener('click', attemptLogin);
+  ['loginUser','loginPass'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+  });
+}
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function monthKeyOf(dateObj){ return dateObj.getFullYear()+'-'+pad(dateObj.getMonth()+1); }
+function dateKeyOf(iso){ const d=new Date(iso); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function timeLabel(iso){
+  return new Date(iso).toLocaleTimeString('en-CA', {hour:'numeric', minute:'2-digit'});
+}
+
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-CA', {hour:'numeric', minute:'2-digit'});
+  document.getElementById('dateLabel').textContent = now.toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+}
+
+async function fetchEvents(){
+  const now = new Date();
+  const month = monthKeyOf(now);
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=calendarEvents&month=${month}&token=${encodeURIComponent(authToken)}`);
+    const data = await res.json();
+    if(data.error === 'unauthorized'){ forceLogout(); return; }
+    events = data.events || [];
+  }catch(err){
+    events = [];
+  }
+  renderCalendar();
+  renderAgenda();
+}
+
+function renderCalendar(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  document.getElementById('calTitle').textContent = now.toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+
+  const startWeekday = new Date(y, m, 1).getDay();
+  const dim = new Date(y, m+1, 0).getDate();
+  const today = todayStr();
+
+  const byDay = {};
+  events.forEach(ev=>{
+    const key = dateKeyOf(ev.start);
+    (byDay[key] = byDay[key] || []).push(ev);
+  });
+
+  const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = weekdays.map(w=>`<div class="dash-weekday">${w}</div>`).join('');
+
+  for(let i=0;i<startWeekday;i++) html += '<div class="dash-day empty"></div>';
+
+  for(let d=1; d<=dim; d++){
+    const dateStr = `${y}-${pad(m+1)}-${pad(d)}`;
+    const dayEvents = (byDay[dateStr]||[]).sort((a,b)=> a.start.localeCompare(b.start));
+    const shown = dayEvents.slice(0,3);
+    const extra = dayEvents.length - shown.length;
+    const pills = shown.map(ev=>{
+      const label = ev.allDay ? ev.title : `${timeLabel(ev.start)} ${ev.title}`;
+      return `<div class="dash-evt">${escapeHtml(label)}</div>`;
+    }).join('');
+    const cls = 'dash-day' + (dateStr===today ? ' today' : '');
+    html += `<div class="${cls}">
+      <div class="dash-day-num">${d}</div>
+      <div class="dash-day-events">${pills}${extra>0?`<div class="dash-day-more">+${extra} more</div>`:''}</div>
+    </div>`;
+  }
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function renderAgenda(){
+  const today = todayStr();
+  const tmrw = new Date(); tmrw.setDate(tmrw.getDate()+1);
+  const tomorrowKey = tmrw.getFullYear()+'-'+pad(tmrw.getMonth()+1)+'-'+pad(tmrw.getDate());
+
+  function buildList(dateKey, elId, cap){
+    const list = events.filter(ev=>dateKeyOf(ev.start)===dateKey).sort((a,b)=> a.start.localeCompare(b.start));
+    const el = document.getElementById(elId);
+    if(list.length===0){ el.innerHTML = '<div class="dash-empty">Nothing scheduled.</div>'; return; }
+    const shown = list.slice(0,cap);
+    const extra = list.length - shown.length;
+    el.innerHTML = shown.map(ev=>`
+      <div class="dash-agenda-row">
+        <span class="dash-agenda-time">${ev.allDay ? 'All day' : timeLabel(ev.start)}</span>
+        <span class="dash-agenda-title">${escapeHtml(ev.title)}</span>
+      </div>
+    `).join('') + (extra>0 ? `<div class="dash-empty">+${extra} more</div>` : '');
+  }
+
+  buildList(today, 'todayList', 6);
+  buildList(tomorrowKey, 'tomorrowList', 4);
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function start(){
+  updateClock();
+  setInterval(updateClock, 1000);
+  fetchEvents();
+  setInterval(fetchEvents, REFRESH_MS);
+}
+
+wireLogin();
+if(authToken){
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('dash').style.display = 'flex';
+  start();
+} else {
+  document.getElementById('loginUser').focus();
+}
+</script>
+</body>
+</html>
