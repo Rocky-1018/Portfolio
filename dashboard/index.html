@@ -73,6 +73,16 @@ html,body{
 }
 .dash-date{color:var(--muted);font-size:clamp(13px,1.4vw,20px);margin-top:4px;}
 
+.dash-quote{
+  text-align:center;flex-shrink:0;padding:0.6vh 2vw;
+  font-family:'Fraunces',serif;font-style:italic;color:var(--muted);
+  font-size:clamp(14px,1.5vw,24px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.dash-quote .author{
+  font-style:normal;font-family:'Inter',sans-serif;color:var(--gold);
+  font-size:0.72em;margin-left:10px;
+}
+
 .dash-main{flex:1;display:flex;gap:1.8vw;min-height:0;}
 
 /* ---- Calendar ---- */
@@ -164,6 +174,8 @@ html,body{
     </div>
   </div>
 
+  <div class="dash-quote" id="quoteBar"></div>
+
   <div class="dash-main">
     <div class="dash-cal">
       <div class="dash-cal-title" id="calTitle">—</div>
@@ -231,6 +243,61 @@ function wireLogin(){
   ['loginUser','loginPass'].forEach(id=>{
     document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
   });
+}
+
+const QUOTES = [
+  {text:"The secret of getting ahead is getting started.", author:"Mark Twain"},
+  {text:"It always seems impossible until it's done.", author:"Nelson Mandela"},
+  {text:"Well done is better than well said.", author:"Benjamin Franklin"},
+  {text:"The way to get started is to quit talking and begin doing.", author:"Walt Disney"},
+  {text:"Don't watch the clock; do what it does. Keep going.", author:"Sam Levenson"},
+  {text:"Success is the sum of small efforts repeated day in and day out.", author:"Robert Collier"},
+  {text:"You don't have to be great to start, but you have to start to be great.", author:"Zig Ziglar"},
+  {text:"Discipline is choosing between what you want now and what you want most.", author:"Abraham Lincoln"},
+  {text:"Small daily improvements are the key to staggering long-term results.", author:"James Clear"},
+  {text:"The future depends on what you do today.", author:"Mahatma Gandhi"},
+  {text:"Do the hard jobs first. The easy jobs will take care of themselves.", author:"Dale Carnegie"},
+  {text:"Motivation is what gets you started. Habit is what keeps you going.", author:"Jim Rohn"},
+  {text:"Action is the foundational key to all success.", author:"Pablo Picasso"},
+  {text:"A year from now you may wish you had started today.", author:"Karen Lamb"},
+  {text:"Focus on being productive instead of busy.", author:"Tim Ferriss"},
+  {text:"What we do today, right now, will have an accumulated effect on all our tomorrows.", author:"Alexandra Stoddard"},
+  {text:"You don't need more time, you just need to decide.", author:"Seth Godin"},
+  {text:"Amateurs sit and wait for inspiration; the rest of us just get up and go to work.", author:"Stephen King"},
+  {text:"The pain of discipline weighs ounces; the pain of regret weighs tons.", author:"Jim Rohn"},
+  {text:"We are what we repeatedly do. Excellence, then, is a habit.", author:"Will Durant"},
+  {text:"Start where you are. Use what you have. Do what you can.", author:"Arthur Ashe"},
+  {text:"Either you run the day, or the day runs you.", author:"Jim Rohn"},
+  {text:"An investment in knowledge pays the best interest.", author:"Benjamin Franklin"},
+  {text:"Simplicity is the ultimate sophistication.", author:"Leonardo da Vinci"},
+  {text:"Quality is not an act, it is a habit.", author:"Aristotle"},
+  {text:"The best time to plant a tree was 20 years ago. The second best time is now.", author:"Chinese Proverb"},
+  {text:"Energy and persistence conquer all things.", author:"Benjamin Franklin"},
+  {text:"He who has a why to live can bear almost any how.", author:"Friedrich Nietzsche"},
+  {text:"Slow is smooth, and smooth is fast.", author:"Navy SEAL saying"},
+  {text:"You miss 100% of the shots you don't take.", author:"Wayne Gretzky"},
+  {text:"Progress, not perfection.", author:"Unknown"},
+  {text:"Do something today that your future self will thank you for.", author:"Sean Patrick Flanery"},
+  {text:"Whether you think you can or you think you can't, you're right.", author:"Henry Ford"},
+  {text:"The only way to do great work is to love what you do.", author:"Steve Jobs"},
+  {text:"Little by little, a little becomes a lot.", author:"Tanzanian Proverb"},
+  {text:"Difficult roads often lead to beautiful destinations.", author:"Unknown"},
+  {text:"Not all those who wander are lost.", author:"J.R.R. Tolkien"},
+  {text:"Patience, persistence and perspiration make an unbeatable combination for success.", author:"Napoleon Hill"},
+  {text:"You are never too old to set another goal or to dream a new dream.", author:"C.S. Lewis"},
+];
+
+function todaysQuote(){
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now - start) / 86400000);
+  return QUOTES[dayOfYear % QUOTES.length];
+}
+
+function renderQuote(){
+  const q = todaysQuote();
+  document.getElementById('quoteBar').innerHTML =
+    `“${escapeHtml(q.text)}”<span class="author">— ${escapeHtml(q.author)}</span>`;
 }
 
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -333,6 +400,7 @@ function escapeHtml(s){
 function start(){
   updateClock();
   setInterval(updateClock, 1000);
+  renderQuote();
   fetchEvents();
   setInterval(fetchEvents, REFRESH_MS);
 }
