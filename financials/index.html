@@ -355,11 +355,12 @@ body{
   </div>
 
   <div class="receipt">
-    <div class="receipt-label">Leftover after expenses</div>
+    <div class="receipt-label">Leftover after expenses & savings</div>
     <div class="receipt-figure" id="leftoverFigure">$0.00</div>
     <div class="receipt-meta">
       <div>Income<b id="metaIncome">$0</b></div>
       <div>Expenses<b id="metaExpense">$0</b></div>
+      <div>Savings<b id="metaSavings">$0</b></div>
     </div>
   </div>
 
@@ -1145,12 +1146,13 @@ function computeTotals(){
   const monthIncome = income.filter(i=>isSelectedMonth(i.date));
   const expenseTotal = monthExpenses.reduce((s,e)=>s+Number(e.amount), 0);
   const incomeTotal = monthIncome.reduce((s,i)=>s+Number(i.amount), 0);
-  const leftover = incomeTotal - expenseTotal;
-  return {income: incomeTotal, expense: expenseTotal, leftover};
+  const savingsTotal = incomeTotal * (savingsRate/100);
+  const leftover = incomeTotal - expenseTotal - savingsTotal;
+  return {income: incomeTotal, expense: expenseTotal, savings: savingsTotal, leftover};
 }
 
 function renderHero(prevLeftover){
-  const {income, expense, leftover} = computeTotals();
+  const {income, expense, savings, leftover} = computeTotals();
   const fig = document.getElementById('leftoverFigure');
   fig.textContent = money(leftover);
   fig.classList.toggle('negative', leftover < 0);
@@ -1160,6 +1162,7 @@ function renderHero(prevLeftover){
   }
   document.getElementById('metaIncome').textContent = money(income);
   document.getElementById('metaExpense').textContent = money(expense);
+  document.getElementById('metaSavings').textContent = money(savings);
 
   const label = document.getElementById('periodLabel');
   label.textContent = monthLabelLong(selectedMonth);
