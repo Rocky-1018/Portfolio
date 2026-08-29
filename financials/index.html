@@ -233,14 +233,16 @@ body{
 .viz-tooltip .tt-value{color:var(--ink);font-weight:700;font-family:'JetBrains Mono',monospace;display:block;font-size:13px;}
 .viz-tooltip .tt-label{color:var(--muted);}
 
-/* ---- Allocation ---- */
-.alloc-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;}
-.alloc-row .name{flex:0 0 150px;color:var(--ink);}
-.alloc-row input[type=number]{
+/* ---- Savings ---- */
+.save-stat-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);}
+.save-stat-row:last-child{border-bottom:none;}
+.save-stat-row b{font-family:'JetBrains Mono',monospace;color:var(--ink);font-weight:700;}
+.save-stat-row.highlight b{color:var(--mint);}
+.save-rate-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
+.save-rate-row input[type=number]{
   width:56px;background:var(--panel-raised);border:1px solid var(--line);
-  color:var(--ink);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'JetBrains Mono',monospace;
+  color:var(--ink);border-radius:5px;padding:5px 6px;font-size:12.5px;font-family:'JetBrains Mono',monospace;
 }
-.alloc-row .amt{flex:1;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--muted);}
 
 .toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -353,7 +355,7 @@ body{
   </div>
 
   <div class="receipt">
-    <div class="receipt-label">Available to save / invest</div>
+    <div class="receipt-label">Leftover after expenses</div>
     <div class="receipt-figure" id="leftoverFigure">$0.00</div>
     <div class="receipt-meta">
       <div>Income<b id="metaIncome">$0</b></div>
@@ -414,12 +416,24 @@ body{
     </div>
 
     <div class="card">
-      <h2>Allocate the leftover</h2>
-      <div id="allocRows"></div>
-      <div class="hint" id="allocCheck"></div>
-      <div class="manage-row" style="margin-top:14px;">
-        <input type="text" id="newAllocName" placeholder="New allocation name">
-        <button class="add-btn" style="width:auto;padding:8px 12px;" id="addAllocBtn">Add</button>
+      <h2>Savings</h2>
+      <div class="hint" style="margin-top:0;">Every deposit automatically counts <span id="savingsRateLabel">10</span>% toward savings.</div>
+      <div class="save-stat-row">
+        <span>This month's income</span>
+        <b id="saveMonthIncome">$0.00</b>
+      </div>
+      <div class="save-stat-row highlight">
+        <span>Savings this month (<span id="saveRateInline">10</span>%)</span>
+        <b id="saveMonthAmount">$0.00</b>
+      </div>
+      <div class="save-stat-row highlight">
+        <span>Total saved all-time</span>
+        <b id="saveAllTime">$0.00</b>
+      </div>
+      <div class="save-rate-row" style="margin-top:14px;">
+        Savings rate
+        <input type="number" id="savingsRateInput" min="0" max="100" step="1" value="10">
+        %
       </div>
     </div>
 
@@ -511,7 +525,7 @@ function wireLogin(){
 const K_EXPENSES = 'expenses-v1';
 const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
-const K_ALLOC = 'allocation-v1';
+const K_SAVINGS_RATE = 'savings-rate-v1';
 const K_RECURRING = 'recurring-v1';
 
 const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
@@ -525,7 +539,7 @@ let expenses = [];
 let income = [];
 let categories = [];
 let recurring = [];
-let allocation = [];
+let savingsRate = 10;
 let selectedMonth = monthKey(todayStr());
 let selectedCalDay = null;
 
@@ -602,8 +616,9 @@ async function loadAll(){
   }catch(err){ categories = []; }
 
   try{
-    if(bundle.allocation) allocation = JSON.parse(bundle.allocation);
-  }catch(err){}
+    const rate = Number(bundle.savingsRate);
+    savingsRate = Number.isFinite(rate) ? rate : 10;
+  }catch(err){ savingsRate = 10; }
 
   try{
     recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
@@ -1153,47 +1168,21 @@ function renderHero(prevLeftover){
   document.getElementById('jumpTodayBtn').style.display = isCurrent ? 'none' : 'inline';
 }
 
-function renderAllocation(){
-  const {leftover} = computeTotals();
-  const el = document.getElementById('allocRows');
-  const checkEl = document.getElementById('allocCheck');
+// tracks savings as a flat percentage of every income deposit (not the leftover
+// after expenses) — so it grows with what you earn, independent of spending
+function renderSavings(){
+  const monthIncome = income.filter(i=>isSelectedMonth(i.date)).reduce((s,i)=>s+Number(i.amount||0), 0);
+  const allTimeIncome = income.reduce((s,i)=>s+Number(i.amount||0), 0);
+  const rate = savingsRate / 100;
 
-  if(allocation.length === 0){
-    el.innerHTML = '<div class="tx-empty">No allocations yet — add one below.</div>';
-    checkEl.textContent = '';
-    return;
-  }
+  document.getElementById('savingsRateLabel').textContent = savingsRate;
+  document.getElementById('saveRateInline').textContent = savingsRate;
+  document.getElementById('saveMonthIncome').textContent = money(monthIncome);
+  document.getElementById('saveMonthAmount').textContent = money(monthIncome * rate);
+  document.getElementById('saveAllTime').textContent = money(allTimeIncome * rate);
 
-  el.innerHTML = allocation.map((a,i)=>`
-    <div class="alloc-row">
-      <span class="name">${a.name}</span>
-      <input type="number" min="0" max="100" step="1" value="${Math.round(a.pct*100)}" data-idx="${i}" class="alloc-pct">
-      <span style="color:var(--muted)">%</span>
-      <span class="amt">${money(leftover*a.pct)}</span>
-      <button class="tx-del alloc-del" data-idx="${i}">×</button>
-    </div>
-  `).join('');
-  el.querySelectorAll('.alloc-pct').forEach(inp=>{
-    inp.addEventListener('change', async ()=>{
-      const idx = Number(inp.dataset.idx);
-      allocation[idx].pct = Number(inp.value)/100;
-      await window.storage.set(K_ALLOC, JSON.stringify(allocation));
-      renderAllocation();
-    });
-  });
-  el.querySelectorAll('.alloc-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const idx = Number(btn.dataset.idx);
-      allocation.splice(idx,1);
-      await window.storage.set(K_ALLOC, JSON.stringify(allocation));
-      renderAllocation();
-      showToast('Allocation removed');
-    });
-  });
-  const totalPct = allocation.reduce((s,a)=>s+a.pct,0);
-  const pctRounded = Math.round(totalPct*100);
-  checkEl.textContent = pctRounded === 100 ? 'Allocations total 100% ✓' : `Allocations total ${pctRounded}% — adjust to reach 100%`;
-  checkEl.style.color = pctRounded===100 ? 'var(--mint)' : 'var(--coral)';
+  const rateInput = document.getElementById('savingsRateInput');
+  if(document.activeElement !== rateInput) rateInput.value = savingsRate;
 }
 
 let lastLeftover;
@@ -1204,7 +1193,7 @@ function renderAll(){
   renderMonthlyInsights();
   renderHero(lastLeftover);
   lastLeftover = computeTotals().leftover;
-  renderAllocation();
+  renderSavings();
 }
 
 // used by the calendar day panel to add expenses/income
@@ -1303,17 +1292,12 @@ function wireEvents(){
     showToast('Added — synced to your Ledger calendar');
   });
 
-  document.getElementById('addAllocBtn').addEventListener('click', async ()=>{
-    const name = document.getElementById('newAllocName').value.trim();
-    if(!name){ showToast('Name the allocation first'); return; }
-    allocation.push({name, pct:0});
-    await window.storage.set(K_ALLOC, JSON.stringify(allocation));
-    document.getElementById('newAllocName').value = '';
-    renderAllocation();
-    showToast('Allocation added');
-  });
-  document.getElementById('newAllocName').addEventListener('keydown', e=>{
-    if(e.key==='Enter') document.getElementById('addAllocBtn').click();
+  document.getElementById('savingsRateInput').addEventListener('change', async (e)=>{
+    const rate = Math.min(Math.max(Number(e.target.value)||0, 0), 100);
+    savingsRate = rate;
+    await window.storage.set(K_SAVINGS_RATE, JSON.stringify(rate));
+    renderSavings();
+    showToast('Savings rate set to ' + rate + '%');
   });
 
   document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
