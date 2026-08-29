@@ -318,45 +318,6 @@ body{
 .login-card p{color:var(--muted);font-size:12.5px;margin:0 0 20px;}
 .login-card .field{margin-bottom:14px;}
 .login-error{color:var(--coral);font-size:12.5px;margin-top:10px;min-height:16px;}
-
-/* ---- Net worth ---- */
-.receipt.net-worth .receipt-figure{color:var(--chart-1);}
-.receipt.net-worth .receipt-figure.negative{color:var(--coral);}
-
-/* ---- Accounts ---- */
-.acct-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;}
-.acct-row input[type=text]{width:110px;flex:1 1 90px;}
-.acct-row select{width:120px;flex:0 0 120px;}
-.acct-row input[type=number]{width:90px;flex:0 0 90px;font-family:'JetBrains Mono',monospace;}
-.acct-row .acct-active{width:auto;flex:0 0 auto;}
-.acct-row-new{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;}
-.acct-empty{color:var(--muted);font-size:13px;padding:10px 0;}
-
-/* ---- Credit cards ---- */
-.cc-card{margin-bottom:16px;}
-.cc-card:last-child{margin-bottom:0;}
-.cc-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:6px;}
-.cc-head .cc-name{color:var(--ink);font-weight:600;}
-.cc-head .cc-pct{font-family:'JetBrains Mono',monospace;color:var(--muted);}
-.cc-bar-track{background:var(--panel-raised);border-radius:5px;height:8px;overflow:hidden;margin-bottom:6px;}
-.cc-bar-fill{height:100%;border-radius:5px;background:var(--mint);transition:width .2s ease;}
-.cc-bar-fill.warn{background:var(--gold);}
-.cc-bar-fill.danger{background:var(--coral);}
-.cc-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
-.cc-due{font-size:11.5px;margin-top:4px;}
-.cc-due.soon{color:var(--gold);}
-
-/* ---- Goals ---- */
-.goal-card{margin-bottom:16px;}
-.goal-card:last-child{margin-bottom:0;}
-.goal-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:6px;}
-.goal-head .goal-name{color:var(--ink);font-weight:600;}
-.goal-head .goal-deadline{color:var(--muted);font-size:11px;}
-.goal-bar-track{background:var(--panel-raised);border-radius:5px;height:8px;overflow:hidden;margin-bottom:6px;}
-.goal-bar-fill{height:100%;border-radius:5px;background:var(--chart-1);}
-.goal-meta{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);}
-.goal-meta input[type=number]{width:80px;font-family:'JetBrains Mono',monospace;background:var(--panel-raised);border:1px solid var(--line);color:var(--ink);border-radius:5px;padding:4px 6px;font-size:11.5px;}
-.goal-del{margin-left:8px;}
 </style>
 </head>
 <body>
@@ -400,59 +361,11 @@ body{
     </div>
   </div>
 
-  <div class="receipt net-worth">
-    <div class="receipt-label">Net worth</div>
-    <div class="receipt-figure" id="netWorthFigure">$0.00</div>
-    <div class="receipt-meta">
-      <div>Cash<b id="metaCash">$0</b></div>
-      <div>Investments<b id="metaInvestments">$0</b></div>
-      <div>Debt<b id="metaDebt">$0</b></div>
-    </div>
-  </div>
-
   <div class="grid">
 
     <div class="card">
-      <h2>Accounts</h2>
-      <div id="acctRows"></div>
-      <div class="acct-row acct-row-new">
-        <input type="text" id="newAcctInstitution" placeholder="Institution">
-        <input type="text" id="newAcctName" placeholder="Account name">
-        <select id="newAcctType">
-          <option value="BANK">Bank</option>
-          <option value="CREDIT_CARD">Credit card</option>
-          <option value="CASH">Cash</option>
-          <option value="INVESTMENT">Investment</option>
-          <option value="LOAN">Loan</option>
-          <option value="MORTGAGE">Mortgage</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <input type="number" id="newAcctBalance" placeholder="Balance" step="0.01">
-        <input type="number" id="newAcctLimit" placeholder="Credit limit" step="0.01" style="display:none;">
-        <button class="add-btn" style="width:auto;padding:8px 12px;" id="addAcctBtn">Add</button>
-      </div>
-      <div class="hint">For credit cards / loans, enter the balance as the amount you owe (positive number).</div>
-    </div>
-
-    <div class="card">
-      <h2>Credit cards</h2>
-      <div id="ccList"></div>
-    </div>
-
-    <div class="card">
-      <h2>Goals</h2>
-      <div id="goalList"></div>
-      <div class="manage-row" style="margin-top:14px;flex-wrap:wrap;gap:8px;">
-        <input type="text" id="newGoalName" placeholder="Goal name" style="flex:1 1 120px;">
-        <input type="number" id="newGoalTarget" placeholder="Target" step="0.01" style="flex:0 0 90px;">
-        <input type="text" id="newGoalDeadline" placeholder="Deadline (e.g. Dec 2026)" style="flex:1 1 120px;">
-        <button class="add-btn" style="width:auto;padding:8px 12px;" id="addGoalBtn">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Categories & fixed expenses</h2>
-      <div class="hint" style="margin-top:0;">Add transactions from the calendar below. Manage your categories and recurring fixed expenses here.</div>
+      <h2>Categories & recurring items</h2>
+      <div class="hint" style="margin-top:0;">Add one-off transactions from the calendar below. Manage your categories and recurring income & bills here.</div>
       <button class="manage-link" id="toggleManage">Manage categories</button>
       <div class="manage-panel" id="managePanel">
         <div class="manage-row">
@@ -461,9 +374,26 @@ body{
         </div>
         <div id="catChips"></div>
       </div>
-      <button class="manage-link" id="toggleRecurringManage">Manage fixed expenses</button>
+      <button class="manage-link" id="toggleRecurringManage">Manage recurring income & bills</button>
       <div class="manage-panel" id="recurringPanel">
         <div id="recurringChips"></div>
+        <div class="manage-row" style="flex-wrap:wrap;gap:8px;margin-top:10px;">
+          <select id="newRecType" style="flex:0 0 90px;">
+            <option value="expense">Bill</option>
+            <option value="income">Income</option>
+          </select>
+          <select id="newRecCategory" style="flex:1 1 100px;"></select>
+          <input type="text" id="newRecDesc" placeholder="Description" style="flex:1 1 100px;">
+          <input type="number" id="newRecAmount" placeholder="Amount" step="0.01" style="flex:0 0 80px;">
+          <select id="newRecFrequency" style="flex:0 0 120px;">
+            <option value="monthly">Monthly</option>
+            <option value="twice-monthly">Twice a month</option>
+          </select>
+          <input type="number" id="newRecDay" placeholder="Day (1-28)" min="1" max="28" style="flex:0 0 90px;">
+          <input type="number" id="newRecDay2" placeholder="2nd day" min="1" max="28" style="flex:0 0 80px;display:none;">
+          <button class="add-btn" style="width:auto;padding:8px 12px;" id="addRecBtn">Add</button>
+        </div>
+        <div class="hint">Bills and paychecks added here post automatically each month and get a reminder synced to a dedicated "Ledger" calendar in Google Calendar.</div>
       </div>
     </div>
 
@@ -583,14 +513,6 @@ const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
 const K_ALLOC = 'allocation-v1';
 const K_RECURRING = 'recurring-v1';
-const K_ACCOUNTS = 'accounts-v1';
-const K_GOALS = 'goals-v1';
-
-const ACCOUNT_TYPE_LABEL = {
-  BANK:'Bank', CREDIT_CARD:'Credit card', CASH:'Cash',
-  INVESTMENT:'Investment', LOAN:'Loan', MORTGAGE:'Mortgage', OTHER:'Other'
-};
-const LIABILITY_TYPES = ['CREDIT_CARD','LOAN','MORTGAGE'];
 
 const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
 const CHART_INCOME = '#2FA37A';
@@ -604,8 +526,6 @@ let income = [];
 let categories = [];
 let recurring = [];
 let allocation = [];
-let accounts = [];
-let goals = [];
 let selectedMonth = monthKey(todayStr());
 let selectedCalDay = null;
 
@@ -689,14 +609,6 @@ async function loadAll(){
     recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
   }catch(err){ recurring = []; }
 
-  try{
-    accounts = bundle.accounts ? JSON.parse(bundle.accounts) : [];
-  }catch(err){ accounts = []; }
-
-  try{
-    goals = bundle.goals ? JSON.parse(bundle.goals) : [];
-  }catch(err){ goals = []; }
-
   if(!fetchOk){
     showToast('Could not load your saved data — check your connection and reload.');
   }
@@ -709,18 +621,28 @@ async function applyRecurring(){
   const cm = monthKey(todayStr());
   const dim = daysInMonthOf(cm);
   let expensesChanged = false;
+  let incomeChanged = false;
   let recurringChanged = false;
   recurring.forEach(t=>{
     if(t.lastGeneratedMonth !== cm){
-      const day = Math.min(Math.max(Number(t.day)||1, 1), dim);
-      const date = cm + '-' + String(day).padStart(2,'0');
-      expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
+      const days = t.frequency === 'twice-monthly' ? [t.day, t.day2] : [t.day];
+      days.forEach(d=>{
+        const day = Math.min(Math.max(Number(d)||1, 1), dim);
+        const date = cm + '-' + String(day).padStart(2,'0');
+        if(t.type === 'income'){
+          income.push({id:cryptoId(), date, desc:t.desc || 'Income', amount:t.amount, recurringId:t.id});
+          incomeChanged = true;
+        } else {
+          expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
+          expensesChanged = true;
+        }
+      });
       t.lastGeneratedMonth = cm;
-      expensesChanged = true;
       recurringChanged = true;
     }
   });
   if(expensesChanged) await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
+  if(incomeChanged) await window.storage.set(K_INCOME, JSON.stringify(income));
   if(recurringChanged) await window.storage.set(K_RECURRING, JSON.stringify(recurring));
 }
 
@@ -770,24 +692,29 @@ function renderCatChips(){
       renderCatChips(); renderAll();
     });
   });
+  const recCatSel = document.getElementById('newRecCategory');
+  if(recCatSel) recCatSel.innerHTML = categories.map(c=>`<option value="${c}">${c}</option>`).join('');
 }
 
 function renderRecurringChips(){
   const el = document.getElementById('recurringChips');
   if(recurring.length===0){
-    el.innerHTML = '<div class="tx-empty">No fixed expenses yet.</div>';
+    el.innerHTML = '<div class="tx-empty">No recurring income or bills yet.</div>';
     return;
   }
-  el.innerHTML = recurring.map((t,i)=>`
-    <span class="chip">${t.category} · ${t.desc || t.category} · ${money(t.amount)} · day ${t.day||1} <button data-idx="${i}" class="chip-del">×</button></span>
-  `).join('');
+  el.innerHTML = recurring.map((t,i)=>{
+    const icon = t.type === 'income' ? '💰' : '🏠';
+    const label = t.desc || t.category || (t.type==='income' ? 'Income' : 'Bill');
+    const freq = t.frequency === 'twice-monthly' ? `days ${t.day}&${t.day2}` : `day ${t.day||1}`;
+    return `<span class="chip">${icon} ${label} · ${money(t.amount)} · ${freq} <button data-idx="${i}" class="chip-del">×</button></span>`;
+  }).join('');
   el.querySelectorAll('.chip-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const idx = Number(btn.dataset.idx);
       recurring.splice(idx,1);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
       renderRecurringChips();
-      showToast('Fixed expense removed — it will stop repeating');
+      showToast('Removed — its calendar reminder is cleared too');
     });
   });
 }
@@ -816,7 +743,7 @@ function renderTxList(){
     const rows = txs.map(tx=>{
       const isExpense = tx.kind==='expense';
       const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
-      const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''}` : 'Income';
+      const sub = (isExpense ? tx.category : 'Income') + (tx.recurringId ? ' · Fixed' : '');
       const desc = tx.desc || (isExpense ? tx.category : 'Income');
       const sign = isExpense ? '-' : '+';
       return `
@@ -926,7 +853,7 @@ function renderCalDayPanel(){
     : dayTxs.map(tx=>{
         const isExpense = tx.kind==='expense';
         const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
-        const sub = isExpense ? `${tx.category}${tx.recurringId ? ' · Fixed' : ''}` : 'Income';
+        const sub = (isExpense ? tx.category : 'Income') + (tx.recurringId ? ' · Fixed' : '');
         const desc = tx.desc || (isExpense ? tx.category : 'Income');
         const sign = isExpense ? '-' : '+';
         return `<div class="tx-row" data-id="${tx.id}">
@@ -968,7 +895,7 @@ function renderCalDayPanel(){
     <div class="form-row" id="calRecurringRow">
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;">
         <input type="checkbox" id="calRecurring" style="width:auto;">
-        Repeat every month (fixed expense)
+        <span id="calRecurringLabel">Repeat every month</span>
       </label>
     </div>
     <button class="add-btn" id="calAddBtn">Add expense</button>
@@ -982,9 +909,9 @@ function renderCalDayPanel(){
   function updateCalTypeUI(){
     const isExpense = calType.value === 'expense';
     document.getElementById('calCategoryRow').style.display = isExpense ? 'flex' : 'none';
-    document.getElementById('calRecurringRow').style.display = isExpense ? 'flex' : 'none';
     document.getElementById('calDescLabel').textContent = isExpense ? 'Description' : 'Source';
     document.getElementById('calAddBtn').textContent = isExpense ? 'Add expense' : 'Add income';
+    document.getElementById('calRecurringLabel').textContent = isExpense ? 'Repeat every month (fixed bill)' : 'Repeat every month (fixed income)';
   }
   calType.addEventListener('change', updateCalTypeUI);
   updateCalTypeUI();
@@ -1269,150 +1196,6 @@ function renderAllocation(){
   checkEl.style.color = pctRounded===100 ? 'var(--mint)' : 'var(--coral)';
 }
 
-function computeNetWorth(){
-  const active = accounts.filter(a=>a.active!==false);
-  const cash = active.filter(a=>a.type==='BANK'||a.type==='CASH').reduce((s,a)=>s+Number(a.balance||0),0);
-  const investments = active.filter(a=>a.type==='INVESTMENT').reduce((s,a)=>s+Number(a.balance||0),0);
-  const debt = active.filter(a=>LIABILITY_TYPES.includes(a.type)).reduce((s,a)=>s+Number(a.balance||0),0);
-  return {cash, investments, debt, netWorth: cash + investments - debt};
-}
-
-function renderNetWorth(){
-  const {cash, investments, debt, netWorth} = computeNetWorth();
-  const fig = document.getElementById('netWorthFigure');
-  fig.textContent = money(netWorth);
-  fig.classList.toggle('negative', netWorth < 0);
-  document.getElementById('metaCash').textContent = money(cash);
-  document.getElementById('metaInvestments').textContent = money(investments);
-  document.getElementById('metaDebt').textContent = money(debt);
-}
-
-function renderAccounts(){
-  const el = document.getElementById('acctRows');
-  if(accounts.length===0){
-    el.innerHTML = '<div class="acct-empty">No accounts yet — add one below.</div>';
-    return;
-  }
-  el.innerHTML = accounts.map((a,i)=>`
-    <div class="acct-row" data-idx="${i}">
-      <input type="text" class="acct-institution" value="${a.institution||''}" placeholder="Institution">
-      <input type="text" class="acct-name" value="${a.name||''}" placeholder="Account name">
-      <select class="acct-type">
-        ${Object.keys(ACCOUNT_TYPE_LABEL).map(t=>`<option value="${t}" ${a.type===t?'selected':''}>${ACCOUNT_TYPE_LABEL[t]}</option>`).join('')}
-      </select>
-      <input type="number" class="acct-balance" value="${a.balance||0}" step="0.01" title="${LIABILITY_TYPES.includes(a.type)?'Amount owed':'Balance'}">
-      <input type="number" class="acct-limit" value="${a.creditLimit||''}" step="0.01" placeholder="Credit limit" style="${a.type==='CREDIT_CARD'?'':'display:none;'}">
-      <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted);">
-        <input type="checkbox" class="acct-active" ${a.active!==false?'checked':''}> active
-      </label>
-      <button class="tx-del acct-del" data-idx="${i}">×</button>
-    </div>
-  `).join('');
-
-  async function saveAccounts(){
-    await window.storage.set(K_ACCOUNTS, JSON.stringify(accounts));
-    renderNetWorth();
-    renderCreditCards();
-  }
-
-  el.querySelectorAll('.acct-row').forEach(row=>{
-    const idx = Number(row.dataset.idx);
-    const typeSel = row.querySelector('.acct-type');
-    const limitInput = row.querySelector('.acct-limit');
-    const sync = (field, val)=>{ accounts[idx][field] = val; saveAccounts(); };
-    row.querySelector('.acct-institution').addEventListener('change', e=> sync('institution', e.target.value.trim()));
-    row.querySelector('.acct-name').addEventListener('change', e=> sync('name', e.target.value.trim()));
-    row.querySelector('.acct-balance').addEventListener('change', e=> sync('balance', Number(e.target.value)||0));
-    row.querySelector('.acct-active').addEventListener('change', e=> sync('active', e.target.checked));
-    limitInput.addEventListener('change', e=> sync('creditLimit', Number(e.target.value)||0));
-    typeSel.addEventListener('change', e=>{
-      accounts[idx].type = e.target.value;
-      limitInput.style.display = e.target.value==='CREDIT_CARD' ? '' : 'none';
-      saveAccounts();
-    });
-  });
-  el.querySelectorAll('.acct-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const idx = Number(btn.dataset.idx);
-      accounts.splice(idx,1);
-      await saveAccounts();
-      renderAccounts();
-      showToast('Account removed');
-    });
-  });
-}
-
-function renderCreditCards(){
-  const el = document.getElementById('ccList');
-  const cards = accounts.filter(a=>a.type==='CREDIT_CARD' && a.active!==false);
-  if(cards.length===0){
-    el.innerHTML = '<div class="tx-empty">No credit cards yet — add one in Accounts.</div>';
-    return;
-  }
-  el.innerHTML = cards.map(a=>{
-    const limit = Number(a.creditLimit||0);
-    const balance = Number(a.balance||0);
-    const pct = limit>0 ? Math.min(100, Math.round((balance/limit)*100)) : 0;
-    const barClass = pct>=70 ? 'danger' : pct>=30 ? 'warn' : '';
-    const available = limit - balance;
-    let dueHtml = '';
-    if(a.dueDate){
-      const due = new Date(a.dueDate+'T00:00:00');
-      const days = Math.round((due - new Date(todayStr()+'T00:00:00')) / 86400000);
-      if(days >= 0 && days <= 7){
-        dueHtml = `<div class="cc-due soon">Payment due in ${days} day${days===1?'':'s'}${a.minPayment?' — ' + money(Number(a.minPayment)):''}</div>`;
-      }
-    }
-    return `
-      <div class="cc-card">
-        <div class="cc-head"><span class="cc-name">${a.institution?a.institution+' ':''}${a.name||'Card'}</span><span class="cc-pct">${pct}%</span></div>
-        <div class="cc-bar-track"><div class="cc-bar-fill ${barClass}" style="width:${pct}%"></div></div>
-        <div class="cc-meta"><span>${money(balance)} / ${money(limit)}</span><span>${money(available)} available</span></div>
-        ${dueHtml}
-      </div>`;
-  }).join('');
-}
-
-function renderGoals(){
-  const el = document.getElementById('goalList');
-  if(goals.length===0){
-    el.innerHTML = '<div class="tx-empty">No goals yet — add one below.</div>';
-    return;
-  }
-  el.innerHTML = goals.map((g,i)=>{
-    const target = Number(g.target||0);
-    const current = Number(g.current||0);
-    const pct = target>0 ? Math.min(100, Math.round((current/target)*100)) : 0;
-    return `
-      <div class="goal-card" data-idx="${i}">
-        <div class="goal-head"><span class="goal-name">${g.name}</span><span class="goal-deadline">${g.deadline||''}</span></div>
-        <div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
-        <div class="goal-meta">
-          <span><input type="number" class="goal-current" value="${current}" step="0.01"> / ${money(target)} (${pct}%)</span>
-          <button class="tx-del goal-del" data-idx="${i}">×</button>
-        </div>
-      </div>`;
-  }).join('');
-
-  el.querySelectorAll('.goal-current').forEach(inp=>{
-    const idx = Number(inp.closest('.goal-card').dataset.idx);
-    inp.addEventListener('change', async ()=>{
-      goals[idx].current = Number(inp.value)||0;
-      await window.storage.set(K_GOALS, JSON.stringify(goals));
-      renderGoals();
-    });
-  });
-  el.querySelectorAll('.goal-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const idx = Number(btn.dataset.idx);
-      goals.splice(idx,1);
-      await window.storage.set(K_GOALS, JSON.stringify(goals));
-      renderGoals();
-      showToast('Goal removed');
-    });
-  });
-}
-
 let lastLeftover;
 function renderAll(){
   renderTxList();
@@ -1422,10 +1205,6 @@ function renderAll(){
   renderHero(lastLeftover);
   lastLeftover = computeTotals().leftover;
   renderAllocation();
-  renderNetWorth();
-  renderAccounts();
-  renderCreditCards();
-  renderGoals();
 }
 
 // used by the calendar day panel to add expenses/income
@@ -1436,22 +1215,33 @@ async function submitTransaction({type, amount, category, desc, date, isRecurrin
     if(!category){ showToast('Add a category first'); return false; }
     if(isRecurring){
       const day = Number(date.slice(8,10));
-      const template = {id:cryptoId(), category, desc, amount, day, lastGeneratedMonth: monthKey(date)};
+      const template = {id:cryptoId(), type:'expense', category, desc, amount, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
       recurring.push(template);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
       expenses.push({id:cryptoId(), date, category, desc, amount, recurringId:template.id});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       renderRecurringChips();
-      showToast('Added ' + money(amount) + ' fixed expense — repeats monthly');
+      showToast('Added ' + money(amount) + ' — repeats monthly, synced to your calendar');
     } else {
       expenses.push({id:cryptoId(), date, category, desc, amount});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       showToast('Added ' + money(amount) + ' to ' + category);
     }
   } else {
-    income.push({id:cryptoId(), date, desc, amount});
-    await window.storage.set(K_INCOME, JSON.stringify(income));
-    showToast('Added ' + money(amount) + ' income');
+    if(isRecurring){
+      const day = Number(date.slice(8,10));
+      const template = {id:cryptoId(), type:'income', desc, amount, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
+      recurring.push(template);
+      await window.storage.set(K_RECURRING, JSON.stringify(recurring));
+      income.push({id:cryptoId(), date, desc, amount, recurringId:template.id});
+      await window.storage.set(K_INCOME, JSON.stringify(income));
+      renderRecurringChips();
+      showToast('Added ' + money(amount) + ' — repeats monthly, synced to your calendar');
+    } else {
+      income.push({id:cryptoId(), date, desc, amount});
+      await window.storage.set(K_INCOME, JSON.stringify(income));
+      showToast('Added ' + money(amount) + ' income');
+    }
   }
 
   renderAll();
@@ -1476,6 +1266,43 @@ function wireEvents(){
     document.getElementById('recurringPanel').classList.toggle('open');
   });
 
+  const newRecType = document.getElementById('newRecType');
+  const newRecFrequency = document.getElementById('newRecFrequency');
+  function updateNewRecUI(){
+    const isIncome = newRecType.value === 'income';
+    document.getElementById('newRecCategory').style.display = isIncome ? 'none' : '';
+    document.getElementById('newRecDesc').placeholder = isIncome ? 'Source (e.g. Paycheck)' : 'Description';
+    document.getElementById('newRecDay2').style.display = newRecFrequency.value === 'twice-monthly' ? '' : 'none';
+  }
+  newRecType.addEventListener('change', updateNewRecUI);
+  newRecFrequency.addEventListener('change', updateNewRecUI);
+  updateNewRecUI();
+
+  document.getElementById('addRecBtn').addEventListener('click', async ()=>{
+    const type = newRecType.value;
+    const amount = Number(document.getElementById('newRecAmount').value);
+    const frequency = newRecFrequency.value;
+    const day = Math.min(Math.max(Number(document.getElementById('newRecDay').value)||1, 1), 28);
+    const category = document.getElementById('newRecCategory').value;
+    const desc = document.getElementById('newRecDesc').value.trim();
+    if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
+    if(type==='expense' && !category){ showToast('Add a category first'); return; }
+    const item = {id:cryptoId(), type, category: type==='expense' ? category : '', desc, amount, frequency, day, lastGeneratedMonth:''};
+    if(frequency==='twice-monthly'){
+      item.day2 = Math.min(Math.max(Number(document.getElementById('newRecDay2').value)||15, 1), 28);
+    }
+    recurring.push(item);
+    await window.storage.set(K_RECURRING, JSON.stringify(recurring));
+    document.getElementById('newRecAmount').value = '';
+    document.getElementById('newRecDesc').value = '';
+    document.getElementById('newRecDay').value = '';
+    document.getElementById('newRecDay2').value = '';
+    renderRecurringChips();
+    await applyRecurring();
+    renderAll();
+    showToast('Added — synced to your Ledger calendar');
+  });
+
   document.getElementById('addAllocBtn').addEventListener('click', async ()=>{
     const name = document.getElementById('newAllocName').value.trim();
     if(!name){ showToast('Name the allocation first'); return; }
@@ -1487,52 +1314,6 @@ function wireEvents(){
   });
   document.getElementById('newAllocName').addEventListener('keydown', e=>{
     if(e.key==='Enter') document.getElementById('addAllocBtn').click();
-  });
-
-  document.getElementById('newAcctType').addEventListener('change', e=>{
-    document.getElementById('newAcctLimit').style.display = e.target.value==='CREDIT_CARD' ? '' : 'none';
-  });
-  document.getElementById('addAcctBtn').addEventListener('click', async ()=>{
-    const name = document.getElementById('newAcctName').value.trim();
-    if(!name){ showToast('Name the account first'); return; }
-    const type = document.getElementById('newAcctType').value;
-    accounts.push({
-      id: cryptoId(),
-      institution: document.getElementById('newAcctInstitution').value.trim(),
-      name,
-      type,
-      currency: 'CAD',
-      balance: Number(document.getElementById('newAcctBalance').value)||0,
-      creditLimit: type==='CREDIT_CARD' ? (Number(document.getElementById('newAcctLimit').value)||0) : 0,
-      active: true,
-    });
-    await window.storage.set(K_ACCOUNTS, JSON.stringify(accounts));
-    document.getElementById('newAcctInstitution').value = '';
-    document.getElementById('newAcctName').value = '';
-    document.getElementById('newAcctBalance').value = '';
-    document.getElementById('newAcctLimit').value = '';
-    renderAccounts(); renderNetWorth(); renderCreditCards();
-    showToast('Account added');
-  });
-
-  document.getElementById('addGoalBtn').addEventListener('click', async ()=>{
-    const name = document.getElementById('newGoalName').value.trim();
-    const target = Number(document.getElementById('newGoalTarget').value);
-    if(!name){ showToast('Name the goal first'); return; }
-    if(!target || target<=0){ showToast('Enter a target amount'); return; }
-    goals.push({
-      id: cryptoId(),
-      name,
-      target,
-      current: 0,
-      deadline: document.getElementById('newGoalDeadline').value.trim(),
-    });
-    await window.storage.set(K_GOALS, JSON.stringify(goals));
-    document.getElementById('newGoalName').value = '';
-    document.getElementById('newGoalTarget').value = '';
-    document.getElementById('newGoalDeadline').value = '';
-    renderGoals();
-    showToast('Goal added');
   });
 
   document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
