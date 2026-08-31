@@ -298,6 +298,7 @@ body{
 }
 .cal-pill.expense{background:rgba(217,87,61,0.18);color:var(--coral);}
 .cal-pill.income{background:rgba(47,163,122,0.18);color:var(--mint);}
+.cal-pill.preview{background:transparent;border:1px dashed currentColor;opacity:0.75;}
 .cal-day-more{font-size:9.5px;color:var(--muted);}
 .cal-panel{border-top:1px solid var(--line);padding-top:16px;}
 .cal-panel-header{font-family:'Fraunces',serif;font-size:15px;margin-bottom:10px;}
@@ -705,6 +706,37 @@ function savingsRateFor(monthKeyStr){
   return DEFAULT_SAVINGS_RATE;
 }
 
+// recurring due dates for a month that haven't been posted as a real expense/income
+// entry yet — applyRecurring() only materializes the current real-world month once
+// per app load, so without this, browsing to a future month (or a recurring item
+// added after this month's batch already ran) would show an empty calendar
+function recurringPreviewsForMonth(monthKeyStr){
+  const dim = daysInMonthOf(monthKeyStr);
+  const postedRecurringIds = new Set();
+  expenses.forEach(e=>{ if(e.recurringId && monthKey(e.date)===monthKeyStr) postedRecurringIds.add(e.recurringId); });
+  income.forEach(i=>{ if(i.recurringId && monthKey(i.date)===monthKeyStr) postedRecurringIds.add(i.recurringId); });
+
+  const previews = [];
+  recurring.forEach(t=>{
+    if(postedRecurringIds.has(t.id)) return;
+    const days = t.frequency==='twice-monthly' ? [t.day, t.day2] : [t.day];
+    days.forEach(d=>{
+      const day = Math.min(Math.max(Number(d)||1, 1), dim);
+      previews.push({
+        id: 'preview-' + t.id + '-' + day,
+        date: monthKeyStr + '-' + String(day).padStart(2,'0'),
+        kind: t.type === 'income' ? 'income' : 'expense',
+        amount: t.amount,
+        category: t.category,
+        desc: t.desc,
+        recurringId: t.id,
+        preview: true,
+      });
+    });
+  });
+  return previews;
+}
+
 function renderCatChips(){
   const el = document.getElementById('catChips');
   el.innerHTML = categories.map((name,i)=>`
@@ -842,6 +874,10 @@ function renderCalendar(){
     const day = Number(i.date.slice(8,10));
     (dayTx[day] = dayTx[day] || []).push({...i, kind:'income'});
   });
+  recurringPreviewsForMonth(selectedMonth).forEach(p=>{
+    const day = Number(p.date.slice(8,10));
+    (dayTx[day] = dayTx[day] || []).push(p);
+  });
 
   const today = todayStr();
   const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -855,8 +891,9 @@ function renderCalendar(){
     const shown = txs.slice(0,2);
     const extra = txs.length - shown.length;
     const pills = shown.map(tx=>{
-      const label = (tx.kind==='income' ? '+' : '-') + moneyShort(tx.amount);
-      return `<div class="cal-pill ${tx.kind}">${label}</div>`;
+      const label = (tx.preview ? '~' : '') + (tx.kind==='income' ? '+' : '-') + moneyShort(tx.amount);
+      const cls = tx.kind + (tx.preview ? ' preview' : '');
+      return `<div class="cal-pill ${cls}">${label}</div>`;
     }).join('');
     const classes = ['cal-day'];
     if(dateStr === today) classes.push('today');
@@ -888,6 +925,7 @@ function renderCalDayPanel(){
   const dayTxs = [
     ...expenses.filter(e=>e.date===selectedCalDay).map(e=>({...e, kind:'expense'})),
     ...income.filter(i=>i.date===selectedCalDay).map(i=>({...i, kind:'income'})),
+    ...recurringPreviewsForMonth(monthKey(selectedCalDay)).filter(p=>p.date===selectedCalDay),
   ].sort((a,b)=> a.kind==='income' ? -1 : 1);
 
   const label = new Date(selectedCalDay + 'T00:00:00').toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'});
@@ -897,14 +935,15 @@ function renderCalDayPanel(){
     : dayTxs.map(tx=>{
         const isExpense = tx.kind==='expense';
         const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
-        const sub = (isExpense ? tx.category : 'Income') + (tx.recurringId ? ' · Fixed' : '');
+        const sub = (isExpense ? tx.category : 'Income') + (tx.preview ? ' · Upcoming' : (tx.recurringId ? ' · Fixed' : ''));
         const desc = tx.desc || (isExpense ? tx.category : 'Income');
         const sign = isExpense ? '-' : '+';
+        const delBtn = tx.preview ? '' : `<button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>`;
         return `<div class="tx-row" data-id="${tx.id}">
           <span class="tx-cat-dot" style="background:${dot}"></span>
           <div class="tx-main"><div class="tx-desc">${desc}</div><div class="tx-sub">${sub}</div></div>
-          <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
-          <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
+          <div class="tx-amount ${tx.kind}">${tx.preview ? '~' : ''}${sign}${money(tx.amount)}</div>
+          ${delBtn}
         </div>`;
       }).join('');
 
