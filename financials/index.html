@@ -418,13 +418,13 @@ body{
 
     <div class="card">
       <h2>Savings</h2>
-      <div class="hint" style="margin-top:0;">Every deposit automatically counts <span id="savingsRateLabel">10</span>% toward savings.</div>
+      <div class="hint" style="margin-top:0;">Set a savings rate per month — it carries forward to future months until you change it again. Past months keep whatever rate was active at the time.</div>
       <div class="save-stat-row">
-        <span>This month's income</span>
+        <span id="saveMonthLabel">This month's income</span>
         <b id="saveMonthIncome">$0.00</b>
       </div>
       <div class="save-stat-row highlight">
-        <span>Savings this month (<span id="saveRateInline">10</span>%)</span>
+        <span>Savings (<span id="saveRateInline">10</span>%)</span>
         <b id="saveMonthAmount">$0.00</b>
       </div>
       <div class="save-stat-row highlight">
@@ -432,7 +432,7 @@ body{
         <b id="saveAllTime">$0.00</b>
       </div>
       <div class="save-rate-row" style="margin-top:14px;">
-        Savings rate
+        Rate for <span id="saveRateMonthLabel">this month</span>
         <input type="number" id="savingsRateInput" min="0" max="100" step="1" value="10">
         %
       </div>
@@ -526,8 +526,9 @@ function wireLogin(){
 const K_EXPENSES = 'expenses-v1';
 const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
-const K_SAVINGS_RATE = 'savings-rate-v1';
+const K_SAVINGS_RATES = 'savings-rates-v1';
 const K_RECURRING = 'recurring-v1';
+const DEFAULT_SAVINGS_RATE = 10;
 
 const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
 const CHART_INCOME = '#2FA37A';
@@ -540,7 +541,7 @@ let expenses = [];
 let income = [];
 let categories = [];
 let recurring = [];
-let savingsRate = 10;
+let savingsRates = {};
 let selectedMonth = monthKey(todayStr());
 let selectedCalDay = null;
 
@@ -617,9 +618,8 @@ async function loadAll(){
   }catch(err){ categories = []; }
 
   try{
-    const rate = Number(bundle.savingsRate);
-    savingsRate = Number.isFinite(rate) ? rate : 10;
-  }catch(err){ savingsRate = 10; }
+    savingsRates = bundle.savingsRates ? JSON.parse(bundle.savingsRates) : {};
+  }catch(err){ savingsRates = {}; }
 
   try{
     recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
@@ -693,6 +693,16 @@ function shiftMonth(key, delta){
 function daysInMonthOf(key){
   const parts = key.split('-');
   return new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
+}
+
+// a month with no explicit rate carries forward the most recent earlier month's
+// rate, so setting it once keeps applying until you change it again — past months
+// aren't affected by a later change since they only look backward from themselves
+function savingsRateFor(monthKeyStr){
+  if(savingsRates[monthKeyStr] !== undefined) return Number(savingsRates[monthKeyStr]);
+  const priorKeys = Object.keys(savingsRates).filter(k=>k < monthKeyStr).sort();
+  if(priorKeys.length > 0) return Number(savingsRates[priorKeys[priorKeys.length-1]]);
+  return DEFAULT_SAVINGS_RATE;
 }
 
 function renderCatChips(){
@@ -1146,7 +1156,7 @@ function computeTotals(){
   const monthIncome = income.filter(i=>isSelectedMonth(i.date));
   const expenseTotal = monthExpenses.reduce((s,e)=>s+Number(e.amount), 0);
   const incomeTotal = monthIncome.reduce((s,i)=>s+Number(i.amount), 0);
-  const savingsTotal = incomeTotal * (savingsRate/100);
+  const savingsTotal = incomeTotal * (savingsRateFor(selectedMonth)/100);
   const leftover = incomeTotal - expenseTotal - savingsTotal;
   return {income: incomeTotal, expense: expenseTotal, savings: savingsTotal, leftover};
 }
@@ -1171,21 +1181,31 @@ function renderHero(prevLeftover){
   document.getElementById('jumpTodayBtn').style.display = isCurrent ? 'none' : 'inline';
 }
 
-// tracks savings as a flat percentage of every income deposit (not the leftover
-// after expenses) — so it grows with what you earn, independent of spending
+// tracks savings as a percentage of every income deposit (not the leftover after
+// expenses) — the rate can differ by month, so each month's income is converted
+// at whatever rate was in effect for that specific month
 function renderSavings(){
+  const monthRate = savingsRateFor(selectedMonth);
   const monthIncome = income.filter(i=>isSelectedMonth(i.date)).reduce((s,i)=>s+Number(i.amount||0), 0);
-  const allTimeIncome = income.reduce((s,i)=>s+Number(i.amount||0), 0);
-  const rate = savingsRate / 100;
 
-  document.getElementById('savingsRateLabel').textContent = savingsRate;
-  document.getElementById('saveRateInline').textContent = savingsRate;
+  const incomeByMonth = {};
+  income.forEach(i=>{
+    const k = monthKey(i.date);
+    if(!k) return;
+    incomeByMonth[k] = (incomeByMonth[k]||0) + Number(i.amount||0);
+  });
+  const allTimeSavings = Object.keys(incomeByMonth)
+    .reduce((s,k)=> s + incomeByMonth[k] * (savingsRateFor(k)/100), 0);
+
+  document.getElementById('saveMonthLabel').textContent = monthLabel(selectedMonth) + "'s income";
+  document.getElementById('saveRateInline').textContent = monthRate;
+  document.getElementById('saveRateMonthLabel').textContent = monthLabel(selectedMonth);
   document.getElementById('saveMonthIncome').textContent = money(monthIncome);
-  document.getElementById('saveMonthAmount').textContent = money(monthIncome * rate);
-  document.getElementById('saveAllTime').textContent = money(allTimeIncome * rate);
+  document.getElementById('saveMonthAmount').textContent = money(monthIncome * (monthRate/100));
+  document.getElementById('saveAllTime').textContent = money(allTimeSavings);
 
   const rateInput = document.getElementById('savingsRateInput');
-  if(document.activeElement !== rateInput) rateInput.value = savingsRate;
+  if(document.activeElement !== rateInput) rateInput.value = monthRate;
 }
 
 let lastLeftover;
@@ -1297,10 +1317,10 @@ function wireEvents(){
 
   document.getElementById('savingsRateInput').addEventListener('change', async (e)=>{
     const rate = Math.min(Math.max(Number(e.target.value)||0, 0), 100);
-    savingsRate = rate;
-    await window.storage.set(K_SAVINGS_RATE, JSON.stringify(rate));
-    renderSavings();
-    showToast('Savings rate set to ' + rate + '%');
+    savingsRates[selectedMonth] = rate;
+    await window.storage.set(K_SAVINGS_RATES, JSON.stringify(savingsRates));
+    renderAll();
+    showToast('Savings rate for ' + monthLabel(selectedMonth) + ' set to ' + rate + '%');
   });
 
   document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
