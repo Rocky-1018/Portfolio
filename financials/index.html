@@ -798,6 +798,9 @@ function renderTxList(){
 }
 
 async function deleteTx(kind, id){
+  const list = kind==='expense' ? expenses : income;
+  const removed = list.find(t=>t.id===id);
+
   if(kind==='expense'){
     expenses = expenses.filter(e=>e.id !== id);
     await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
@@ -805,6 +808,21 @@ async function deleteTx(kind, id){
     income = income.filter(i=>i.id !== id);
     await window.storage.set(K_INCOME, JSON.stringify(income));
   }
+
+  // this only removes this month's occurrence — the recurring rule (and its
+  // Google Calendar reminder) stays active unless the user also stops it here
+  if(removed && removed.recurringId){
+    const stopRecurring = confirm('This is a recurring item. Also stop it from repeating?\n\nOK — stop repeating (removes its Google Calendar reminder too)\nCancel — just remove this one occurrence');
+    if(stopRecurring){
+      recurring = recurring.filter(t=>t.id !== removed.recurringId);
+      await window.storage.set(K_RECURRING, JSON.stringify(recurring));
+      renderRecurringChips();
+      showToast('Removed and stopped repeating');
+      renderAll();
+      return;
+    }
+  }
+
   renderAll();
   showToast('Removed');
 }
