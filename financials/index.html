@@ -1693,6 +1693,40 @@ if(authToken){
 } else {
   document.getElementById('loginUser').focus();
 }
+
+//end of script 
+  document.getElementById('addBankAccountBtn').addEventListener('click', addBankAccount);
+
+  async function addBankAccount() {
+    const name = document.getElementById('bankAccountName').value.trim();
+    const type = document.getElementById('bankAccountType').value;
+    const balance = Number(document.getElementById('bankAccountBalance').value || 0);
+
+    if (!name) {
+      showToast('Enter an account name.');
+      return;
+    }
+
+    bankAccounts.push({
+      id: cryptoId(),
+      name,
+      type,
+      openingBalance: balance
+    });
+
+    await window.storage.set(K_BANK_ACCOUNTS, JSON.stringify(bankAccounts));
+
+    document.getElementById('bankAccountName').value = '';
+    document.getElementById('bankAccountBalance').value = '';
+
+    renderAccounts();
+    renderCreditCards();
+    renderExpenseAccountOptions();
+
+    showToast('Bank account added.');
+  }
+
+
 </script>
 </body>
 </html>
