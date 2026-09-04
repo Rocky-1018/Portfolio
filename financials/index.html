@@ -327,6 +327,9 @@ body{
 .credit-card-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
 .credit-card-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .credit-card-balance{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--coral);margin:10px 0 7px;}
+.bank-card-balance{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--mint);margin:10px 0 7px;}
+.account-section-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:18px 0 9px;}
+.savings-reveal{margin-top:12px;}
 .credit-card-meta{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;}
 .util-track{height:5px;background:var(--line);border-radius:99px;overflow:hidden;margin:10px 0 7px;}
 .util-fill{height:100%;background:var(--mint);border-radius:inherit;}
@@ -400,10 +403,17 @@ body{
   </div>
 
   <div class="card" style="margin-bottom:20px;">
-    <h2>Credit cards</h2>
-    <div class="hint" style="margin-top:-8px;margin-bottom:14px;">Card purchases are tracked here and do not reduce the leftover budget until you record a payment.</div>
+    <h2>Accounts & credit</h2>
+    <div class="hint" style="margin-top:-8px;margin-bottom:14px;">Spend from chequing or a credit card. Savings stays out of everyday payment choices and receives your monthly savings allocation.</div>
+    <div id="accountOverview"></div>
     <div id="creditCardSummary"></div>
     <div class="card-form">
+      <div class="form-row">
+        <div class="field"><label>Bank account name</label><input type="text" id="bankAccountName" placeholder="e.g. Everyday Chequing"></div>
+        <div class="field"><label>Type</label><select id="bankAccountType"><option value="chequing">Chequing</option><option value="savings">Savings (hidden from spending)</option></select></div>
+        <div class="field"><label>Starting balance (CAD)</label><input type="number" id="bankAccountBalance" step="0.01" placeholder="0.00"></div>
+        <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addBankAccountBtn">Add account</button></div>
+      </div>
       <div class="form-row">
         <div class="field"><label>Card name</label><input type="text" id="cardName" placeholder="e.g. TD Cash Back Visa"></div>
         <div class="field"><label>Credit limit (CAD)</label><input type="number" id="cardLimit" min="0" step="0.01" placeholder="5000"></div>
@@ -415,6 +425,7 @@ body{
       </div>
       <div class="form-row" id="cardPaymentForm" style="display:none;margin-bottom:0;">
         <div class="field"><label>Make a payment to</label><select id="paymentCard"></select></div>
+        <div class="field"><label>Pay from</label><select id="paymentAccount"></select></div>
         <div class="field amount-field"><label>Payment amount (CAD)</label><input type="number" id="paymentAmount" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addPaymentBtn">Record payment</button></div>
       </div>
@@ -585,6 +596,7 @@ const K_SAVINGS_RATES = 'savings-rates-v1';
 const K_RECURRING = 'recurring-v1';
 const K_CREDIT_CARDS = 'credit-cards-v1';
 const K_CARD_PAYMENTS = 'card-payments-v1';
+const K_BANK_ACCOUNTS = 'bank-accounts-v1';
 const DEFAULT_SAVINGS_RATE = 10;
 
 const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
@@ -600,6 +612,7 @@ let categories = [];
 let recurring = [];
 let creditCards = [];
 let cardPayments = [];
+let bankAccounts = [];
 let savingsRates = {};
 let selectedMonth = monthKey(todayStr());
 let selectedCalDay = null;
@@ -692,6 +705,7 @@ async function loadAll(){
   // fall back to the regular keyed endpoint without affecting existing data.
   let savedCards = bundle.creditCards ?? bundle[K_CREDIT_CARDS];
   let savedPayments = bundle.cardPayments ?? bundle[K_CARD_PAYMENTS];
+  let savedAccounts = bundle.bankAccounts ?? bundle[K_BANK_ACCOUNTS];
   try{
     if(savedCards === undefined) savedCards = (await window.storage.get(K_CREDIT_CARDS))?.value;
     creditCards = savedCards ? JSON.parse(savedCards) : [];
@@ -701,6 +715,11 @@ async function loadAll(){
     if(savedPayments === undefined) savedPayments = (await window.storage.get(K_CARD_PAYMENTS))?.value;
     cardPayments = savedPayments ? JSON.parse(savedPayments) : [];
   }catch(err){ cardPayments = []; }
+
+  try{
+    if(savedAccounts === undefined) savedAccounts = (await window.storage.get(K_BANK_ACCOUNTS))?.value;
+    bankAccounts = savedAccounts ? JSON.parse(savedAccounts) : [];
+  }catch(err){ bankAccounts = []; }
 
   if(!fetchOk){
     showToast('Could not load your saved data — check your connection and reload.');
@@ -723,10 +742,10 @@ async function applyRecurring(){
         const day = Math.min(Math.max(Number(d)||1, 1), dim);
         const date = cm + '-' + String(day).padStart(2,'0');
         if(t.type === 'income'){
-          income.push({id:cryptoId(), date, desc:t.desc || 'Income', amount:t.amount, recurringId:t.id});
+          income.push({id:cryptoId(), date, desc:t.desc || 'Income', amount:t.amount, accountId:t.accountId || '', recurringId:t.id});
           incomeChanged = true;
         } else {
-          expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, cardId:t.cardId || '', recurringId:t.id});
+          expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, cardId:t.cardId || '', accountId:t.accountId || '', recurringId:t.id});
           expensesChanged = true;
         }
       });
@@ -757,6 +776,41 @@ function cardName(cardId){
   const card = creditCards.find(c=>c.id===cardId);
   return card ? card.name : '';
 }
+function accountName(accountId){
+  const account = bankAccounts.find(a=>a.id===accountId);
+  return account ? account.name : '';
+}
+
+function totalSavedAllTime(){
+  const incomeByMonth = {};
+  income.forEach(i=>{
+    const k = monthKey(i.date);
+    if(k) incomeByMonth[k] = (incomeByMonth[k]||0) + Number(i.amount||0);
+  });
+  return Object.keys(incomeByMonth).reduce((sum,k)=>sum + incomeByMonth[k] * (savingsRateFor(k)/100), 0);
+}
+
+function bankBalance(account){
+  const spent = expenses.filter(e=>e.accountId===account.id).reduce((sum,e)=>sum+Number(e.amount||0),0);
+  if(account.type === 'savings') return Math.max(0, totalSavedAllTime() - spent);
+  const deposits = income.filter(i=>i.accountId===account.id).reduce((sum,i)=>sum+Number(i.amount||0),0);
+  const cardPaymentsFromAccount = cardPayments.filter(p=>p.fromAccountId===account.id).reduce((sum,p)=>sum+Number(p.amount||0),0);
+  return Number(account.openingBalance||0) + deposits - spent - cardPaymentsFromAccount;
+}
+
+function availableBankAccounts(){ return bankAccounts.filter(a=>a.type !== 'savings'); }
+
+function renderAccounts(){
+  const el = document.getElementById('accountOverview');
+  const visibleAccounts = availableBankAccounts();
+  const savingsAccount = bankAccounts.find(a=>a.type==='savings');
+  const accountCard = account => `<div class="credit-card"><div class="credit-card-head"><span class="credit-card-name">${escapeHtml(account.name)}</span><span class="hint">${account.type==='savings'?'Savings reserve':'Available to spend'}</span></div><div class="bank-card-balance">${money(bankBalance(account))}</div><div class="credit-card-meta"><span>${account.type==='savings' ? 'Monthly savings less emergency use' : 'Balance after tracked activity'}</span></div></div>`;
+  let html = visibleAccounts.length ? `<div class="account-section-label">Bank accounts</div><div class="credit-summary">${visibleAccounts.map(accountCard).join('')}</div>` : '<div class="tx-empty">Add your chequing account to track funds available to spend.</div>';
+  if(savingsAccount){
+    html += `<details class="savings-reveal"><summary class="manage-link">Show savings reserve</summary><div class="credit-summary" style="margin-top:10px;">${accountCard(savingsAccount)}</div></details>`;
+  }
+  el.innerHTML = html;
+}
 
 function nextDayLabel(day){
   if(!day) return 'No due date set';
@@ -771,12 +825,13 @@ function renderCreditCards(){
   const el = document.getElementById('creditCardSummary');
   const paymentForm = document.getElementById('cardPaymentForm');
   const paymentCard = document.getElementById('paymentCard');
+  const paymentAccount = document.getElementById('paymentAccount');
   if(creditCards.length===0){
     el.innerHTML = '<div class="tx-empty">Add a card to track its balance, utilization, and payment date.</div>';
     paymentForm.style.display = 'none';
     return;
   }
-  el.innerHTML = `<div class="credit-summary">${creditCards.map(card=>{
+  el.innerHTML = `<div class="account-section-label">Credit cards</div><div class="credit-summary">${creditCards.map(card=>{
     const balance = cardBalance(card.id);
     const limit = Number(card.limit||0);
     const utilization = limit ? Math.min(100, balance/limit*100) : 0;
@@ -788,6 +843,7 @@ function renderCreditCards(){
     </div>`;
   }).join('')}</div>`;
   paymentCard.innerHTML = creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  paymentAccount.innerHTML = `<option value="">Untracked account</option>${availableBankAccounts().map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}`;
   paymentForm.style.display = 'flex';
 }
 
@@ -928,7 +984,7 @@ function renderTxList(){
       const isExpense = tx.kind==='expense';
       const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
       const sub = (isExpense ? tx.category : 'Income') + (tx.recurringId ? ' · Fixed' : '');
-      const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : '';
+      const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : (tx.accountId ? ' · ' + accountName(tx.accountId) : '');
       const desc = tx.desc || (isExpense ? tx.category : 'Income');
       const sign = isExpense ? '-' : '+';
       return `
@@ -1063,7 +1119,7 @@ function renderCalDayPanel(){
         const isExpense = tx.kind==='expense';
         const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
         const sub = (isExpense ? tx.category : 'Income') + (tx.preview ? ' · Upcoming' : (tx.recurringId ? ' · Fixed' : ''));
-        const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : '';
+        const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : (tx.accountId ? ' · ' + accountName(tx.accountId) : '');
         const desc = tx.desc || (isExpense ? tx.category : 'Income');
         const sign = isExpense ? '-' : '+';
         const delBtn = tx.preview ? '' : `<button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>`;
@@ -1097,12 +1153,14 @@ function renderCalDayPanel(){
         <select id="calCategory">${categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</select>
       </div>
     </div>
-    <div class="form-row" id="calCardRow" style="${creditCards.length ? '' : 'display:none;'}">
+    <div class="form-row" id="calPaymentSourceRow" style="${creditCards.length || availableBankAccounts().length ? '' : 'display:none;'}">
       <div class="field">
         <label>Paid with</label>
-        <select id="calCard"><option value="">Cash / debit / other</option>${creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
+        <select id="calPaymentSource"><option value="">Untracked cash / debit</option><optgroup label="Bank accounts">${availableBankAccounts().map(a=>`<option value="bank:${a.id}">${escapeHtml(a.name)}</option>`).join('')}</optgroup><optgroup label="Credit cards">${creditCards.map(c=>`<option value="card:${c.id}">${escapeHtml(c.name)}</option>`).join('')}</optgroup></select>
       </div>
     </div>
+    <div class="form-row" id="calEmergencyRow" style="display:none;"><label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--gold);cursor:pointer;"><input type="checkbox" id="calUseSavings" style="width:auto;"> Use savings for an emergency expense</label></div>
+    <div class="form-row" id="calIncomeAccountRow" style="display:none;"><div class="field"><label>Deposit to</label><select id="calIncomeAccount"><option value="">Untracked income</option>${availableBankAccounts().map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}</select></div></div>
     <div class="form-row">
       <div class="field">
         <label id="calDescLabel">Description</label>
@@ -1126,7 +1184,9 @@ function renderCalDayPanel(){
   function updateCalTypeUI(){
     const isExpense = calType.value === 'expense';
     document.getElementById('calCategoryRow').style.display = isExpense ? 'flex' : 'none';
-    document.getElementById('calCardRow').style.display = isExpense && creditCards.length ? 'flex' : 'none';
+    document.getElementById('calPaymentSourceRow').style.display = isExpense && (creditCards.length || availableBankAccounts().length) ? 'flex' : 'none';
+    document.getElementById('calEmergencyRow').style.display = isExpense && bankAccounts.some(a=>a.type==='savings') ? 'flex' : 'none';
+    document.getElementById('calIncomeAccountRow').style.display = !isExpense && availableBankAccounts().length ? 'flex' : 'none';
     document.getElementById('calDescLabel').textContent = isExpense ? 'Description' : 'Source';
     document.getElementById('calAddBtn').textContent = isExpense ? 'Add expense' : 'Add income';
     document.getElementById('calRecurringLabel').textContent = isExpense ? 'Repeat every month (fixed bill)' : 'Repeat every month (fixed income)';
@@ -1135,11 +1195,15 @@ function renderCalDayPanel(){
   updateCalTypeUI();
 
   document.getElementById('calAddBtn').addEventListener('click', ()=>{
+    const source = document.getElementById('calPaymentSource').value;
+    const useSavings = document.getElementById('calUseSavings').checked;
+    const savingsAccount = bankAccounts.find(a=>a.type==='savings');
     submitTransaction({
       type: calType.value,
       amount: Number(document.getElementById('calAmount').value),
       category: document.getElementById('calCategory').value,
-      cardId: document.getElementById('calCard').value,
+      cardId: source.startsWith('card:') ? source.slice(5) : '',
+      accountId: useSavings && savingsAccount ? savingsAccount.id : (source.startsWith('bank:') ? source.slice(5) : (calType.value==='income' ? document.getElementById('calIncomeAccount').value : '')),
       desc: document.getElementById('calDesc').value.trim(),
       date: selectedCalDay,
       isRecurring: document.getElementById('calRecurring').checked,
@@ -1405,6 +1469,7 @@ function renderSavings(){
 
 let lastLeftover;
 function renderAll(){
+  renderAccounts();
   renderCreditCards();
   renderTxList();
   renderCalendar();
@@ -1416,22 +1481,22 @@ function renderAll(){
 }
 
 // used by the calendar day panel to add expenses/income
-async function submitTransaction({type, amount, category, desc, date, isRecurring, cardId=''}){
+async function submitTransaction({type, amount, category, desc, date, isRecurring, cardId='', accountId=''}){
   if(!amount || amount<=0){ showToast('Enter an amount first'); return false; }
 
   if(type === 'expense'){
     if(!category){ showToast('Add a category first'); return false; }
     if(isRecurring){
       const day = Number(date.slice(8,10));
-      const template = {id:cryptoId(), type:'expense', category, desc, amount, cardId, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
+      const template = {id:cryptoId(), type:'expense', category, desc, amount, cardId, accountId, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
       recurring.push(template);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
-      expenses.push({id:cryptoId(), date, category, desc, amount, cardId, recurringId:template.id});
+      expenses.push({id:cryptoId(), date, category, desc, amount, cardId, accountId, recurringId:template.id});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       renderRecurringChips();
       showToast('Added ' + money(amount) + ' — repeats monthly, synced to your calendar');
     } else {
-      expenses.push({id:cryptoId(), date, category, desc, amount, cardId});
+      expenses.push({id:cryptoId(), date, category, desc, amount, cardId, accountId});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       showToast('Added ' + money(amount) + ' to ' + category);
     }
@@ -1441,12 +1506,12 @@ async function submitTransaction({type, amount, category, desc, date, isRecurrin
       const template = {id:cryptoId(), type:'income', desc, amount, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
       recurring.push(template);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
-      income.push({id:cryptoId(), date, desc, amount, recurringId:template.id});
+      income.push({id:cryptoId(), date, desc, amount, accountId, recurringId:template.id});
       await window.storage.set(K_INCOME, JSON.stringify(income));
       renderRecurringChips();
       showToast('Added ' + money(amount) + ' — repeats monthly, synced to your calendar');
     } else {
-      income.push({id:cryptoId(), date, desc, amount});
+      income.push({id:cryptoId(), date, desc, amount, accountId});
       await window.storage.set(K_INCOME, JSON.stringify(income));
       showToast('Added ' + money(amount) + ' income');
     }
@@ -1457,6 +1522,22 @@ async function submitTransaction({type, amount, category, desc, date, isRecurrin
 }
 
 function wireEvents(){
+  document.getElementById('addBankAccountBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('bankAccountName').value.trim();
+    if(!name){ showToast('Name the account first'); return; }
+    const account = {id:cryptoId(), name, type:document.getElementById('bankAccountType').value, openingBalance:Number(document.getElementById('bankAccountBalance').value)||0};
+    bankAccounts.push(account);
+    try{
+      await window.storage.set(K_BANK_ACCOUNTS, JSON.stringify(bankAccounts));
+      ['bankAccountName','bankAccountBalance'].forEach(id=>document.getElementById(id).value='');
+      renderAll();
+      showToast(account.type==='savings' ? 'Savings account added and hidden from spending' : 'Bank account added');
+    }catch(err){
+      bankAccounts = bankAccounts.filter(a=>a.id!==account.id);
+      showToast('Could not save the bank account');
+    }
+  });
+
   document.getElementById('addCardBtn').addEventListener('click', async ()=>{
     const name = document.getElementById('cardName').value.trim();
     const limit = Number(document.getElementById('cardLimit').value);
@@ -1479,7 +1560,7 @@ function wireEvents(){
     const cardId = document.getElementById('paymentCard').value;
     const amount = Number(document.getElementById('paymentAmount').value);
     if(!cardId || !amount || amount<=0){ showToast('Choose a card and enter a payment'); return; }
-    const payment = {id:cryptoId(), cardId, amount, date:todayStr()};
+    const payment = {id:cryptoId(), cardId, fromAccountId:document.getElementById('paymentAccount').value, amount, date:todayStr()};
     cardPayments.push(payment);
     try{
       await window.storage.set(K_CARD_PAYMENTS, JSON.stringify(cardPayments));
