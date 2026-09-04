@@ -58,6 +58,9 @@ body{
   font-family:inherit;
 }
 .month-nav-btn:hover{border-color:var(--mint);color:var(--mint);}
+.month-nav-btn:focus-visible,.add-btn:focus-visible,.manage-link:focus-visible,.tx-del:focus-visible,.chip button:focus-visible{
+  outline:2px solid var(--mint);outline-offset:2px;
+}
 .month-nav .sub{min-width:112px;text-align:center;}
 
 /* ---- Receipt / hero card ---- */
@@ -112,6 +115,16 @@ body{
 /* ---- Grid layout ---- */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:800px){.grid{grid-template-columns:1fr;}}
+@media(max-width:520px){
+  .wrap{padding:18px 12px 40px;}
+  .topbar{align-items:flex-start;margin-bottom:16px;}
+  .month-nav{width:100%;justify-content:space-between;}
+  .receipt{padding:22px 18px 18px;}
+  .receipt-figure{font-size:44px;}
+  .card{padding:17px 15px;}
+  .form-row{gap:8px;}
+  .tx-list{max-height:360px;}
+}
 
 .card{
   background:var(--panel);
@@ -308,6 +321,18 @@ body{
 }
 
 /* ---- Login ---- */
+/* ---- Credit cards ---- */
+.credit-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;}
+.credit-card{background:var(--panel-raised);border:1px solid var(--line);border-radius:8px;padding:14px;}
+.credit-card-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
+.credit-card-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.credit-card-balance{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--coral);margin:10px 0 7px;}
+.credit-card-meta{font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;}
+.util-track{height:5px;background:var(--line);border-radius:99px;overflow:hidden;margin:10px 0 7px;}
+.util-fill{height:100%;background:var(--mint);border-radius:inherit;}
+.util-fill.high{background:var(--coral);}
+.card-form{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+
 .login-overlay{
   position:fixed;inset:0;background:var(--bg);
   display:flex;align-items:center;justify-content:center;
@@ -321,6 +346,7 @@ body{
 .login-card p{color:var(--muted);font-size:12.5px;margin:0 0 20px;}
 .login-card .field{margin-bottom:14px;}
 .login-error{color:var(--coral);font-size:12.5px;margin-top:10px;min-height:16px;}
+.app-status{color:var(--muted);font-size:12.5px;text-align:center;padding:48px 0;}
 </style>
 </head>
 <body>
@@ -344,6 +370,8 @@ body{
 
 <div class="wrap" id="appWrap" style="display:none;">
 
+  <div class="app-status" id="appStatus" role="status" aria-live="polite">Loading your ledger…</div>
+
   <div class="topbar">
     <h1>Ledger</h1>
     <div class="month-nav">
@@ -362,6 +390,27 @@ body{
       <div>Income<b id="metaIncome">$0</b></div>
       <div>Expenses<b id="metaExpense">$0</b></div>
       <div>Savings<b id="metaSavings">$0</b></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h2>Credit cards</h2>
+    <div id="creditCardSummary"></div>
+    <div class="card-form">
+      <div class="form-row">
+        <div class="field"><label>Card name</label><input type="text" id="cardName" placeholder="e.g. TD Cash Back Visa"></div>
+        <div class="field"><label>Credit limit (CAD)</label><input type="number" id="cardLimit" min="0" step="0.01" placeholder="5000"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Payment due day</label><input type="number" id="cardDueDay" min="1" max="31" placeholder="e.g. 15"></div>
+        <div class="field"><label>Statement day</label><input type="number" id="cardStatementDay" min="1" max="31" placeholder="e.g. 22"></div>
+        <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addCardBtn">Add card</button></div>
+      </div>
+      <div class="form-row" id="cardPaymentForm" style="display:none;margin-bottom:0;">
+        <div class="field"><label>Make a payment to</label><select id="paymentCard"></select></div>
+        <div class="field amount-field"><label>Payment amount (CAD)</label><input type="number" id="paymentAmount" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addPaymentBtn">Record payment</button></div>
+      </div>
     </div>
   </div>
 
@@ -447,7 +496,7 @@ body{
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="viz-tooltip" id="vizTooltip"></div>
 
 <script>
@@ -459,6 +508,7 @@ let authToken = localStorage.getItem(K_TOKEN) || '';
 window.storage = {
   async get(key){
     const res = await fetch(`${APPS_SCRIPT_URL}?key=${encodeURIComponent(key)}&token=${encodeURIComponent(authToken)}`);
+    if(!res.ok) throw new Error('Unable to load data');
     const data = await res.json();
     if(data.error === 'unauthorized'){ forceLogout(); return null; }
     if(data.value === null || data.value === undefined) return null;
@@ -466,6 +516,7 @@ window.storage = {
   },
   async getAll(){
     const res = await fetch(`${APPS_SCRIPT_URL}?action=getAll&token=${encodeURIComponent(authToken)}`);
+    if(!res.ok) throw new Error('Unable to load data');
     const data = await res.json();
     if(data.error === 'unauthorized'){ forceLogout(); return null; }
     return data;
@@ -476,8 +527,10 @@ window.storage = {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: value
     });
+    if(!res.ok) throw new Error('Unable to save data');
     const data = await res.json();
     if(data.error === 'unauthorized'){ forceLogout(); }
+    if(data.error) throw new Error(data.error);
   }
 };
 
@@ -529,6 +582,8 @@ const K_INCOME = 'income-v1';
 const K_CATEGORIES = 'categories-v1';
 const K_SAVINGS_RATES = 'savings-rates-v1';
 const K_RECURRING = 'recurring-v1';
+const K_CREDIT_CARDS = 'credit-cards-v1';
+const K_CARD_PAYMENTS = 'card-payments-v1';
 const DEFAULT_SAVINGS_RATE = 10;
 
 const CAT_COLORS = ['#3987E5','#D95926','#199E70','#C98500','#D55181','#008300','#9085E9','#E66767'];
@@ -542,9 +597,12 @@ let expenses = [];
 let income = [];
 let categories = [];
 let recurring = [];
+let creditCards = [];
+let cardPayments = [];
 let savingsRates = {};
 let selectedMonth = monthKey(todayStr());
 let selectedCalDay = null;
+let eventsWired = false;
 
 function money(n){
   const sign = n < 0 ? '-' : '';
@@ -562,7 +620,10 @@ function roundedTopBarPath(x, w, baseline, barH, r){
   if(rr <= 0.5) return `M ${x} ${baseline} L ${x} ${yTop} L ${x+w} ${yTop} L ${x+w} ${baseline} Z`;
   return `M ${x} ${baseline} L ${x} ${yTop+rr} Q ${x} ${yTop} ${x+rr} ${yTop} L ${x+w-rr} ${yTop} Q ${x+w} ${yTop} ${x+w} ${yTop+rr} L ${x+w} ${baseline} Z`;
 }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  const now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+}
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -626,6 +687,20 @@ async function loadAll(){
     recurring = bundle.recurring ? JSON.parse(bundle.recurring) : [];
   }catch(err){ recurring = []; }
 
+  // Older server versions may not include these newer keys in getAll(), so
+  // fall back to the regular keyed endpoint without affecting existing data.
+  let savedCards = bundle.creditCards ?? bundle[K_CREDIT_CARDS];
+  let savedPayments = bundle.cardPayments ?? bundle[K_CARD_PAYMENTS];
+  try{
+    if(savedCards === undefined) savedCards = (await window.storage.get(K_CREDIT_CARDS))?.value;
+    creditCards = savedCards ? JSON.parse(savedCards) : [];
+  }catch(err){ creditCards = []; }
+
+  try{
+    if(savedPayments === undefined) savedPayments = (await window.storage.get(K_CARD_PAYMENTS))?.value;
+    cardPayments = savedPayments ? JSON.parse(savedPayments) : [];
+  }catch(err){ cardPayments = []; }
+
   if(!fetchOk){
     showToast('Could not load your saved data — check your connection and reload.');
   }
@@ -650,7 +725,7 @@ async function applyRecurring(){
           income.push({id:cryptoId(), date, desc:t.desc || 'Income', amount:t.amount, recurringId:t.id});
           incomeChanged = true;
         } else {
-          expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, recurringId:t.id});
+          expenses.push({id:cryptoId(), date, category:t.category, desc:t.desc, amount:t.amount, cardId:t.cardId || '', recurringId:t.id});
           expensesChanged = true;
         }
       });
@@ -664,6 +739,56 @@ async function applyRecurring(){
 }
 
 function cryptoId(){ return 'x' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+function escapeHtml(value){
+  const node = document.createElement('span');
+  node.textContent = String(value ?? '');
+  return node.innerHTML;
+}
+
+function cardBalance(cardId){
+  const charges = expenses.filter(e=>e.cardId===cardId).reduce((sum,e)=>sum + Number(e.amount||0),0);
+  const payments = cardPayments.filter(p=>p.cardId===cardId).reduce((sum,p)=>sum + Number(p.amount||0),0);
+  return Math.max(0, charges - payments);
+}
+
+function cardName(cardId){
+  const card = creditCards.find(c=>c.id===cardId);
+  return card ? card.name : '';
+}
+
+function nextDayLabel(day){
+  if(!day) return 'No due date set';
+  const now = new Date();
+  let due = new Date(now.getFullYear(), now.getMonth(), Math.min(Number(day), daysInMonthOf(monthKey(todayStr()))));
+  if(due < new Date(now.getFullYear(), now.getMonth(), now.getDate())) due = new Date(now.getFullYear(), now.getMonth()+1, Math.min(Number(day), 28));
+  const days = Math.ceil((due - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  return days === 0 ? 'Due today' : `Due in ${days} day${days===1?'':'s'}`;
+}
+
+function renderCreditCards(){
+  const el = document.getElementById('creditCardSummary');
+  const paymentForm = document.getElementById('cardPaymentForm');
+  const paymentCard = document.getElementById('paymentCard');
+  if(creditCards.length===0){
+    el.innerHTML = '<div class="tx-empty">Add a card to track its balance, utilization, and payment date.</div>';
+    paymentForm.style.display = 'none';
+    return;
+  }
+  el.innerHTML = `<div class="credit-summary">${creditCards.map(card=>{
+    const balance = cardBalance(card.id);
+    const limit = Number(card.limit||0);
+    const utilization = limit ? Math.min(100, balance/limit*100) : 0;
+    return `<div class="credit-card">
+      <div class="credit-card-head"><span class="credit-card-name">${escapeHtml(card.name)}</span><span class="hint">${nextDayLabel(card.dueDay)}</span></div>
+      <div class="credit-card-balance">${money(balance)}</div>
+      <div class="util-track"><div class="util-fill ${utilization>=50?'high':''}" style="width:${utilization}%"></div></div>
+      <div class="credit-card-meta"><span>${limit ? `${Math.round(utilization)}% of ${money(limit)}` : 'No limit set'}</span><span>Statement: ${card.statementDay ? 'day '+card.statementDay : '—'}</span></div>
+    </div>`;
+  }).join('')}</div>`;
+  paymentCard.innerHTML = creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  paymentForm.style.display = 'flex';
+}
 
 function catColor(name){
   const idx = categories.indexOf(name);
@@ -740,7 +865,7 @@ function recurringPreviewsForMonth(monthKeyStr){
 function renderCatChips(){
   const el = document.getElementById('catChips');
   el.innerHTML = categories.map((name,i)=>`
-    <span class="chip">${name} <button data-idx="${i}" class="chip-del">×</button></span>
+    <span class="chip">${escapeHtml(name)} <button data-idx="${i}" class="chip-del">×</button></span>
   `).join('');
   el.querySelectorAll('.chip-del').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -751,7 +876,7 @@ function renderCatChips(){
     });
   });
   const recCatSel = document.getElementById('newRecCategory');
-  if(recCatSel) recCatSel.innerHTML = categories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  if(recCatSel) recCatSel.innerHTML = categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 }
 
 function renderRecurringChips(){
@@ -762,7 +887,7 @@ function renderRecurringChips(){
   }
   el.innerHTML = recurring.map((t,i)=>{
     const icon = t.type === 'income' ? '💰' : '🏠';
-    const label = t.desc || t.category || (t.type==='income' ? 'Income' : 'Bill');
+    const label = escapeHtml(t.desc || t.category || (t.type==='income' ? 'Income' : 'Bill'));
     const freq = t.frequency === 'twice-monthly' ? `days ${t.day}&${t.day2}` : `day ${t.day||1}`;
     return `<span class="chip">${icon} ${label} · ${money(t.amount)} · ${freq} <button data-idx="${i}" class="chip-del">×</button></span>`;
   }).join('');
@@ -802,14 +927,15 @@ function renderTxList(){
       const isExpense = tx.kind==='expense';
       const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
       const sub = (isExpense ? tx.category : 'Income') + (tx.recurringId ? ' · Fixed' : '');
+      const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : '';
       const desc = tx.desc || (isExpense ? tx.category : 'Income');
       const sign = isExpense ? '-' : '+';
       return `
       <div class="tx-row" data-id="${tx.id}">
         <span class="tx-cat-dot" style="background:${dot}"></span>
         <div class="tx-main">
-          <div class="tx-desc">${desc}</div>
-          <div class="tx-sub">${sub}</div>
+          <div class="tx-desc">${escapeHtml(desc)}</div>
+          <div class="tx-sub">${escapeHtml(sub + cardLabel)}</div>
         </div>
         <div class="tx-amount ${tx.kind}">${sign}${money(tx.amount)}</div>
         <button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>
@@ -936,12 +1062,13 @@ function renderCalDayPanel(){
         const isExpense = tx.kind==='expense';
         const dot = isExpense ? catColor(tx.category) : 'var(--mint)';
         const sub = (isExpense ? tx.category : 'Income') + (tx.preview ? ' · Upcoming' : (tx.recurringId ? ' · Fixed' : ''));
+        const cardLabel = tx.cardId ? ' · ' + cardName(tx.cardId) : '';
         const desc = tx.desc || (isExpense ? tx.category : 'Income');
         const sign = isExpense ? '-' : '+';
         const delBtn = tx.preview ? '' : `<button class="tx-del" data-id="${tx.id}" data-kind="${tx.kind}">×</button>`;
         return `<div class="tx-row" data-id="${tx.id}">
           <span class="tx-cat-dot" style="background:${dot}"></span>
-          <div class="tx-main"><div class="tx-desc">${desc}</div><div class="tx-sub">${sub}</div></div>
+          <div class="tx-main"><div class="tx-desc">${escapeHtml(desc)}</div><div class="tx-sub">${escapeHtml(sub + cardLabel)}</div></div>
           <div class="tx-amount ${tx.kind}">${tx.preview ? '~' : ''}${sign}${money(tx.amount)}</div>
           ${delBtn}
         </div>`;
@@ -966,7 +1093,13 @@ function renderCalDayPanel(){
     <div class="form-row" id="calCategoryRow">
       <div class="field">
         <label>Category</label>
-        <select id="calCategory">${categories.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+        <select id="calCategory">${categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-row" id="calCardRow" style="${creditCards.length ? '' : 'display:none;'}">
+      <div class="field">
+        <label>Paid with</label>
+        <select id="calCard"><option value="">Cash / debit / other</option>${creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select>
       </div>
     </div>
     <div class="form-row">
@@ -992,6 +1125,7 @@ function renderCalDayPanel(){
   function updateCalTypeUI(){
     const isExpense = calType.value === 'expense';
     document.getElementById('calCategoryRow').style.display = isExpense ? 'flex' : 'none';
+    document.getElementById('calCardRow').style.display = isExpense && creditCards.length ? 'flex' : 'none';
     document.getElementById('calDescLabel').textContent = isExpense ? 'Description' : 'Source';
     document.getElementById('calAddBtn').textContent = isExpense ? 'Add expense' : 'Add income';
     document.getElementById('calRecurringLabel').textContent = isExpense ? 'Repeat every month (fixed bill)' : 'Repeat every month (fixed income)';
@@ -1004,6 +1138,7 @@ function renderCalDayPanel(){
       type: calType.value,
       amount: Number(document.getElementById('calAmount').value),
       category: document.getElementById('calCategory').value,
+      cardId: document.getElementById('calCard').value,
       desc: document.getElementById('calDesc').value.trim(),
       date: selectedCalDay,
       isRecurring: document.getElementById('calRecurring').checked,
@@ -1267,6 +1402,7 @@ function renderSavings(){
 
 let lastLeftover;
 function renderAll(){
+  renderCreditCards();
   renderTxList();
   renderCalendar();
   renderCatBreakdown();
@@ -1277,22 +1413,22 @@ function renderAll(){
 }
 
 // used by the calendar day panel to add expenses/income
-async function submitTransaction({type, amount, category, desc, date, isRecurring}){
+async function submitTransaction({type, amount, category, desc, date, isRecurring, cardId=''}){
   if(!amount || amount<=0){ showToast('Enter an amount first'); return false; }
 
   if(type === 'expense'){
     if(!category){ showToast('Add a category first'); return false; }
     if(isRecurring){
       const day = Number(date.slice(8,10));
-      const template = {id:cryptoId(), type:'expense', category, desc, amount, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
+      const template = {id:cryptoId(), type:'expense', category, desc, amount, cardId, frequency:'monthly', day, lastGeneratedMonth: monthKey(date)};
       recurring.push(template);
       await window.storage.set(K_RECURRING, JSON.stringify(recurring));
-      expenses.push({id:cryptoId(), date, category, desc, amount, recurringId:template.id});
+      expenses.push({id:cryptoId(), date, category, desc, amount, cardId, recurringId:template.id});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       renderRecurringChips();
       showToast('Added ' + money(amount) + ' — repeats monthly, synced to your calendar');
     } else {
-      expenses.push({id:cryptoId(), date, category, desc, amount});
+      expenses.push({id:cryptoId(), date, category, desc, amount, cardId});
       await window.storage.set(K_EXPENSES, JSON.stringify(expenses));
       showToast('Added ' + money(amount) + ' to ' + category);
     }
@@ -1318,6 +1454,40 @@ async function submitTransaction({type, amount, category, desc, date, isRecurrin
 }
 
 function wireEvents(){
+  document.getElementById('addCardBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('cardName').value.trim();
+    const limit = Number(document.getElementById('cardLimit').value);
+    const dueDay = Number(document.getElementById('cardDueDay').value);
+    const statementDay = Number(document.getElementById('cardStatementDay').value);
+    if(!name){ showToast('Name the card first'); return; }
+    creditCards.push({id:cryptoId(), name, limit: Math.max(0,limit||0), dueDay: dueDay>=1&&dueDay<=31 ? dueDay : 0, statementDay: statementDay>=1&&statementDay<=31 ? statementDay : 0});
+    try{
+      await window.storage.set(K_CREDIT_CARDS, JSON.stringify(creditCards));
+      ['cardName','cardLimit','cardDueDay','cardStatementDay'].forEach(id=>document.getElementById(id).value='');
+      renderAll();
+      showToast('Card added');
+    }catch(err){
+      creditCards.pop();
+      showToast('Could not save the card');
+    }
+  });
+
+  document.getElementById('addPaymentBtn').addEventListener('click', async ()=>{
+    const cardId = document.getElementById('paymentCard').value;
+    const amount = Number(document.getElementById('paymentAmount').value);
+    if(!cardId || !amount || amount<=0){ showToast('Choose a card and enter a payment'); return; }
+    const payment = {id:cryptoId(), cardId, amount, date:todayStr()};
+    cardPayments.push(payment);
+    try{
+      await window.storage.set(K_CARD_PAYMENTS, JSON.stringify(cardPayments));
+      document.getElementById('paymentAmount').value = '';
+      renderAll();
+      showToast('Payment recorded — not counted as an expense');
+    }catch(err){
+      cardPayments = cardPayments.filter(p=>p.id!==payment.id);
+      showToast('Could not save the payment');
+    }
+  });
   document.getElementById('toggleManage').addEventListener('click', ()=>{
     document.getElementById('managePanel').classList.toggle('open');
   });
@@ -1398,12 +1568,24 @@ function wireEvents(){
 }
 
 async function init(){
-  await loadAll();
-  await applyRecurring();
-  renderCatChips();
-  renderRecurringChips();
-  wireEvents();
-  renderAll();
+  const status = document.getElementById('appStatus');
+  status.hidden = false;
+  try{
+    await loadAll();
+    await applyRecurring();
+    renderCatChips();
+    renderRecurringChips();
+    if(!eventsWired){
+      wireEvents();
+      eventsWired = true;
+    }
+    renderAll();
+  }catch(err){
+    status.textContent = 'Your ledger could not be loaded. Check your connection, then reload.';
+    showToast('Could not synchronize your ledger');
+    return;
+  }
+  status.hidden = true;
 }
 
 wireLogin();
