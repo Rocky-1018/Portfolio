@@ -388,7 +388,7 @@ body{
     <div class="receipt-figure" id="leftoverFigure">$0.00</div>
     <div class="receipt-meta">
       <div>Income<b id="metaIncome">$0</b></div>
-      <div>Expenses<b id="metaExpense">$0</b></div>
+      <div>Cash / debit expenses<b id="metaExpense">$0</b></div>
       <div>Savings<b id="metaSavings">$0</b></div>
     </div>
   </div>
@@ -401,6 +401,7 @@ body{
 
   <div class="card" style="margin-bottom:20px;">
     <h2>Credit cards</h2>
+    <div class="hint" style="margin-top:-8px;margin-bottom:14px;">Card purchases are tracked here and do not reduce the leftover budget until you record a payment.</div>
     <div id="creditCardSummary"></div>
     <div class="card-form">
       <div class="form-row">
@@ -1344,7 +1345,9 @@ function renderCatBreakdown(){
 }
 
 function computeTotals(){
-  const monthExpenses = expenses.filter(e=>isSelectedMonth(e.date));
+  // Credit-card charges are debt, not money that has left the budget yet. They
+  // stay in the Credit Cards balance; only cash/debit expenses reduce leftover.
+  const monthExpenses = expenses.filter(e=>isSelectedMonth(e.date) && !e.cardId);
   const monthIncome = income.filter(i=>isSelectedMonth(i.date));
   const expenseTotal = monthExpenses.reduce((s,e)=>s+Number(e.amount), 0);
   const incomeTotal = monthIncome.reduce((s,i)=>s+Number(i.amount), 0);
