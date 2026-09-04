@@ -60,8 +60,28 @@ html,body{
   padding:2.2vh 2.2vw;
   flex-direction:column;
   gap:1.8vh;
+  position:relative;
+  isolation:isolate;
+}
+.dash::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  background-image:url('../assets/images/dashboard-background.png');
+  background-size:cover;
+  background-position:center;
+}
+.dash::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  background:linear-gradient(120deg,rgba(8,13,16,.78),rgba(8,13,16,.52) 58%,rgba(8,13,16,.68));
+  pointer-events:none;
 }
 .dash-top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:1vh;}
+.dash-top,.dash-quote,.dash-main{position:relative;z-index:1;}
 .dash-top h1{
   font-family:'Fraunces',serif;font-weight:500;font-size:clamp(20px,2.4vw,34px);
   margin:0;letter-spacing:0.3px;
@@ -83,11 +103,33 @@ html,body{
   font-size:0.72em;margin-left:10px;
 }
 
+/* ---- At-a-glance insights ---- */
+.dash-insights{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1vw;flex-shrink:0;
+}
+.dash-insight{
+  min-width:0;padding:1.1vh 1.1vw;border-radius:12px;
+  background:rgba(15,23,27,.82);border:1px solid rgba(126,150,162,.34);
+  backdrop-filter:blur(8px);
+}
+.dash-insight-label{
+  color:var(--muted);font-size:clamp(9px,.8vw,12px);font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.dash-insight-value{
+  margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:clamp(15px,1.5vw,23px);
+  font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.dash-insight-detail{
+  margin-top:2px;color:var(--mint);font-size:clamp(9px,.78vw,12px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
 .dash-main{flex:1;display:flex;gap:1.8vw;min-height:0;}
 
 /* ---- Calendar ---- */
 .dash-cal{
-  flex:2.15;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  flex:2.15;background:rgba(23,31,36,.88);border:1px solid rgba(126,150,162,.38);border-radius:16px;
   padding:1.6vw;display:flex;flex-direction:column;min-height:0;min-width:0;
 }
 .dash-cal-title{
@@ -123,7 +165,7 @@ html,body{
 
 /* ---- Agenda sidebar ---- */
 .dash-agenda{
-  flex:1;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  flex:1;background:rgba(23,31,36,.88);border:1px solid rgba(126,150,162,.38);border-radius:16px;
   padding:1.6vw;display:flex;flex-direction:column;gap:2vh;min-height:0;min-width:0;overflow:hidden;
 }
 .dash-agenda-section{display:flex;flex-direction:column;min-height:0;}
@@ -144,6 +186,14 @@ html,body{
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .dash-empty{color:var(--muted);font-size:clamp(12px,1.1vw,18px);}
+
+@media (max-width:720px){
+  html,body{overflow:auto;}
+  .dash{height:auto;min-height:100vh;}
+  .dash-main{flex-direction:column;min-height:680px;}
+  .dash-cal{min-height:500px;}
+  .dash-insights{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
 </style>
 </head>
 <body>
@@ -175,6 +225,29 @@ html,body{
   </div>
 
   <div class="dash-quote" id="quoteBar"></div>
+
+  <div class="dash-insights" aria-label="Schedule summary">
+    <div class="dash-insight">
+      <div class="dash-insight-label">Today</div>
+      <div class="dash-insight-value" id="todayCount">—</div>
+      <div class="dash-insight-detail" id="todayDetail">Loading schedule</div>
+    </div>
+    <div class="dash-insight">
+      <div class="dash-insight-label">Time blocked</div>
+      <div class="dash-insight-value" id="timeBlocked">—</div>
+      <div class="dash-insight-detail" id="timeBlockedDetail">Today’s meetings</div>
+    </div>
+    <div class="dash-insight">
+      <div class="dash-insight-label">Next up</div>
+      <div class="dash-insight-value" id="nextEvent">—</div>
+      <div class="dash-insight-detail" id="nextEventDetail">No upcoming event</div>
+    </div>
+    <div class="dash-insight">
+      <div class="dash-insight-label">This month</div>
+      <div class="dash-insight-value" id="monthCount">—</div>
+      <div class="dash-insight-detail" id="monthDetail">Calendar events</div>
+    </div>
+  </div>
 
   <div class="dash-main">
     <div class="dash-cal">
@@ -327,6 +400,36 @@ async function fetchEvents(){
   }
   renderCalendar();
   renderAgenda();
+  renderInsights();
+}
+
+function renderInsights(){
+  const now = new Date();
+  const today = todayStr();
+  const month = monthKeyOf(now);
+  const todayEvents = events.filter(ev=>dateKeyOf(ev.start)===today);
+  const monthEvents = events.filter(ev=>monthKeyOf(new Date(ev.start))===month);
+  const timedToday = todayEvents.filter(ev=>!ev.allDay);
+  const blockedMinutes = timedToday.reduce((total, ev)=>{
+    const start = new Date(ev.start);
+    const end = ev.end ? new Date(ev.end) : null;
+    return total + (end && end > start ? Math.round((end - start) / 60000) : 0);
+  }, 0);
+  const upcoming = events
+    .filter(ev=>!ev.allDay && new Date(ev.start) >= now)
+    .sort((a,b)=>new Date(a.start)-new Date(b.start))[0];
+  const duration = blockedMinutes >= 60
+    ? `${Math.floor(blockedMinutes/60)}h${blockedMinutes%60 ? ` ${blockedMinutes%60}m` : ''}`
+    : `${blockedMinutes}m`;
+
+  document.getElementById('todayCount').textContent = `${todayEvents.length} ${todayEvents.length===1 ? 'event' : 'events'}`;
+  document.getElementById('todayDetail').textContent = todayEvents.length ? 'Your schedule is ready' : 'Clear day ahead';
+  document.getElementById('timeBlocked').textContent = timedToday.length ? duration : '0m';
+  document.getElementById('timeBlockedDetail').textContent = timedToday.length ? `${timedToday.length} timed ${timedToday.length===1 ? 'event' : 'events'}` : 'No timed events today';
+  document.getElementById('nextEvent').textContent = upcoming ? timeLabel(upcoming.start) : 'Clear';
+  document.getElementById('nextEventDetail').textContent = upcoming ? upcoming.title : 'Nothing else scheduled';
+  document.getElementById('monthCount').textContent = `${monthEvents.length} ${monthEvents.length===1 ? 'event' : 'events'}`;
+  document.getElementById('monthDetail').textContent = now.toLocaleDateString('en-CA', {month:'long'}) + ' calendar';
 }
 
 function renderCalendar(){
