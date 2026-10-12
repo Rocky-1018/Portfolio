@@ -417,6 +417,7 @@ body{
       <div class="form-row">
         <div class="field"><label for="cardName">Card name</label><input type="text" id="cardName" placeholder="e.g. TD Cash Back Visa"></div>
         <div class="field"><label for="cardLimit">Credit limit (CAD)</label><input type="number" id="cardLimit" min="0" step="0.01" placeholder="5000"></div>
+        <div class="field"><label for="cardOpeningBalance">Current balance (CAD)</label><input type="number" id="cardOpeningBalance" min="0" step="0.01" placeholder="0.00"></div>
       </div>
       <div class="form-row">
         <div class="field"><label for="cardDueDay">Payment due day</label><input type="number" id="cardDueDay" min="1" max="31" placeholder="e.g. 15"></div>
@@ -768,9 +769,11 @@ function escapeHtml(value){
 }
 
 function cardBalance(cardId){
+  const card = creditCards.find(c=>c.id===cardId);
+  const opening = Number(card?.openingBalance || 0);
   const charges = expenses.filter(e=>e.cardId===cardId).reduce((sum,e)=>sum + Number(e.amount||0),0);
   const payments = cardPayments.filter(p=>p.cardId===cardId).reduce((sum,p)=>sum + Number(p.amount||0),0);
-  return Math.max(0, charges - payments);
+  return Math.max(0, opening + charges - payments);
 }
 
 function cardName(cardId){
@@ -857,9 +860,16 @@ function renderCreditCards(){
   el.querySelectorAll('.del-card-btn').forEach(btn=>{
     btn.addEventListener('click', ()=> deleteCreditCard(btn.dataset.id));
   });
-  paymentCard.innerHTML = creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  paymentCard.innerHTML = creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)} (${money(cardBalance(c.id))})</option>`).join('');
   paymentAccount.innerHTML = `<option value="">Untracked account</option>${availableBankAccounts().map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}`;
   paymentForm.style.display = 'flex';
+
+  paymentCard.onchange = () => {
+    const activeCardId = paymentCard.value;
+    const balance = cardBalance(activeCardId);
+    document.getElementById('paymentAmount').value = balance > 0 ? balance.toFixed(2) : '';
+  };
+  if(paymentCard.value) paymentCard.onchange();
 }
 
 async function deleteCreditCard(id){
@@ -1095,6 +1105,23 @@ function renderCalendar(){
   recurringPreviewsForMonth(selectedMonth).forEach(p=>{
     const day = Number(p.date.slice(8,10));
     (dayTx[day] = dayTx[day] || []).push(p);
+  });
+
+  // Credit card payment due dates
+  creditCards.forEach(card=>{
+    if(!card.dueDay) return;
+    const balance = cardBalance(card.id);
+    if(balance <= 0) return;
+    const day = Math.min(Math.max(Number(card.dueDay)||1, 1), dim);
+    (dayTx[day] = dayTx[day] || []).push({
+      id: 'card-due-' + card.id + '-' + selectedMonth,
+      date: selectedMonth + '-' + String(day).padStart(2,'0'),
+      kind: 'expense',
+      amount: balance,
+      desc: card.name + ' Due',
+      preview: true,
+      cardDue: true
+    });
   });
 
   const today = todayStr();
@@ -1577,13 +1604,14 @@ function wireEvents(){
   document.getElementById('addCardBtn').addEventListener('click', async ()=>{
     const name = document.getElementById('cardName').value.trim();
     const limit = Number(document.getElementById('cardLimit').value);
+    const openingBalance = Number(document.getElementById('cardOpeningBalance').value) || 0;
     const dueDay = Number(document.getElementById('cardDueDay').value);
     const statementDay = Number(document.getElementById('cardStatementDay').value);
     if(!name){ showToast('Name the card first'); return; }
-    creditCards.push({id:cryptoId(), name, limit: Math.max(0,limit||0), dueDay: dueDay>=1&&dueDay<=31 ? dueDay : 0, statementDay: statementDay>=1&&statementDay<=31 ? statementDay : 0});
+    creditCards.push({id:cryptoId(), name, limit: Math.max(0,limit||0), openingBalance: Math.max(0, openingBalance), dueDay: dueDay>=1&&dueDay<=31 ? dueDay : 0, statementDay: statementDay>=1&&statementDay<=31 ? statementDay : 0});
     try{
       await window.storage.set(K_CREDIT_CARDS, JSON.stringify(creditCards));
-      ['cardName','cardLimit','cardDueDay','cardStatementDay'].forEach(id=>document.getElementById(id).value='');
+      ['cardName','cardLimit','cardOpeningBalance','cardDueDay','cardStatementDay'].forEach(id=>document.getElementById(id).value='');
       renderAll();
       showToast('Card added');
     }catch(err){
