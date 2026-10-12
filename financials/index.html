@@ -359,11 +359,11 @@ body{
     <h1>Ledger</h1>
     <p>Sign in to continue.</p>
     <div class="field">
-      <label>Username</label>
+      <label for="loginUser">Username</label>
       <input type="text" id="loginUser" autocomplete="username">
     </div>
     <div class="field">
-      <label>Password</label>
+      <label for="loginPass">Password</label>
       <input type="password" id="loginPass" autocomplete="current-password">
     </div>
     <button class="add-btn" id="loginBtn">Sign in</button>
@@ -409,24 +409,24 @@ body{
     <div id="creditCardSummary"></div>
     <div class="card-form">
       <div class="form-row">
-        <div class="field"><label>Bank account name</label><input type="text" id="bankAccountName" placeholder="e.g. Everyday Chequing"></div>
-        <div class="field"><label>Type</label><select id="bankAccountType"><option value="chequing">Chequing</option><option value="savings">Savings (hidden from spending)</option></select></div>
-        <div class="field"><label>Starting balance (CAD)</label><input type="number" id="bankAccountBalance" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label for="bankAccountName">Bank account name</label><input type="text" id="bankAccountName" placeholder="e.g. Everyday Chequing"></div>
+        <div class="field"><label for="bankAccountType">Type</label><select id="bankAccountType"><option value="chequing">Chequing</option><option value="savings">Savings (hidden from spending)</option></select></div>
+        <div class="field"><label for="bankAccountBalance">Starting balance (CAD)</label><input type="number" id="bankAccountBalance" step="0.01" placeholder="0.00"></div>
         <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addBankAccountBtn">Add account</button></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>Card name</label><input type="text" id="cardName" placeholder="e.g. TD Cash Back Visa"></div>
-        <div class="field"><label>Credit limit (CAD)</label><input type="number" id="cardLimit" min="0" step="0.01" placeholder="5000"></div>
+        <div class="field"><label for="cardName">Card name</label><input type="text" id="cardName" placeholder="e.g. TD Cash Back Visa"></div>
+        <div class="field"><label for="cardLimit">Credit limit (CAD)</label><input type="number" id="cardLimit" min="0" step="0.01" placeholder="5000"></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>Payment due day</label><input type="number" id="cardDueDay" min="1" max="31" placeholder="e.g. 15"></div>
-        <div class="field"><label>Statement day</label><input type="number" id="cardStatementDay" min="1" max="31" placeholder="e.g. 22"></div>
+        <div class="field"><label for="cardDueDay">Payment due day</label><input type="number" id="cardDueDay" min="1" max="31" placeholder="e.g. 15"></div>
+        <div class="field"><label for="cardStatementDay">Statement day</label><input type="number" id="cardStatementDay" min="1" max="31" placeholder="e.g. 22"></div>
         <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addCardBtn">Add card</button></div>
       </div>
       <div class="form-row" id="cardPaymentForm" style="display:none;margin-bottom:0;">
-        <div class="field"><label>Make a payment to</label><select id="paymentCard"></select></div>
-        <div class="field"><label>Pay from</label><select id="paymentAccount"></select></div>
-        <div class="field amount-field"><label>Payment amount (CAD)</label><input type="number" id="paymentAmount" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label for="paymentCard">Make a payment to</label><select id="paymentCard"></select></div>
+        <div class="field"><label for="paymentAccount">Pay from</label><select id="paymentAccount"></select></div>
+        <div class="field amount-field"><label for="paymentAmount">Payment amount (CAD)</label><input type="number" id="paymentAmount" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field" style="justify-content:flex-end;"><button class="add-btn" id="addPaymentBtn">Record payment</button></div>
       </div>
     </div>
@@ -454,6 +454,7 @@ body{
             <option value="income">Income</option>
           </select>
           <select id="newRecCategory" style="flex:1 1 100px;"></select>
+          <select id="newRecSource" style="flex:1 1 120px;"></select>
           <input type="text" id="newRecDesc" placeholder="Description" style="flex:1 1 100px;">
           <input type="number" id="newRecAmount" placeholder="Amount" step="0.01" style="flex:0 0 80px;">
           <select id="newRecFrequency" style="flex:0 0 120px;">
@@ -804,12 +805,23 @@ function renderAccounts(){
   const el = document.getElementById('accountOverview');
   const visibleAccounts = availableBankAccounts();
   const savingsAccount = bankAccounts.find(a=>a.type==='savings');
-  const accountCard = account => `<div class="credit-card"><div class="credit-card-head"><span class="credit-card-name">${escapeHtml(account.name)}</span><span class="hint">${account.type==='savings'?'Savings reserve':'Available to spend'}</span></div><div class="bank-card-balance">${money(bankBalance(account))}</div><div class="credit-card-meta"><span>${account.type==='savings' ? 'Monthly savings less emergency use' : 'Balance after tracked activity'}</span></div></div>`;
+  const accountCard = account => `<div class="credit-card"><div class="credit-card-head"><span class="credit-card-name">${escapeHtml(account.name)}</span><div style="display:flex;align-items:center;gap:6px;"><span class="hint">${account.type==='savings'?'Savings reserve':'Available to spend'}</span><button class="tx-del del-account-btn" data-id="${account.id}" title="Delete account">×</button></div></div><div class="bank-card-balance">${money(bankBalance(account))}</div><div class="credit-card-meta"><span>${account.type==='savings' ? 'Monthly savings less emergency use' : 'Balance after tracked activity'}</span></div></div>`;
   let html = visibleAccounts.length ? `<div class="account-section-label">Bank accounts</div><div class="credit-summary">${visibleAccounts.map(accountCard).join('')}</div>` : '<div class="tx-empty">Add your chequing account to track funds available to spend.</div>';
   if(savingsAccount){
     html += `<details class="savings-reveal"><summary class="manage-link">Show savings reserve</summary><div class="credit-summary" style="margin-top:10px;">${accountCard(savingsAccount)}</div></details>`;
   }
   el.innerHTML = html;
+  el.querySelectorAll('.del-account-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteBankAccount(btn.dataset.id));
+  });
+}
+
+async function deleteBankAccount(id){
+  if(!confirm('Delete this bank account?')) return;
+  bankAccounts = bankAccounts.filter(a=>a.id!==id);
+  await window.storage.set(K_BANK_ACCOUNTS, JSON.stringify(bankAccounts));
+  renderAll();
+  showToast('Bank account deleted');
 }
 
 function nextDayLabel(day){
@@ -836,15 +848,26 @@ function renderCreditCards(){
     const limit = Number(card.limit||0);
     const utilization = limit ? Math.min(100, balance/limit*100) : 0;
     return `<div class="credit-card">
-      <div class="credit-card-head"><span class="credit-card-name">${escapeHtml(card.name)}</span><span class="hint">${nextDayLabel(card.dueDay)}</span></div>
+      <div class="credit-card-head"><span class="credit-card-name">${escapeHtml(card.name)}</span><div style="display:flex;align-items:center;gap:6px;"><span class="hint">${nextDayLabel(card.dueDay)}</span><button class="tx-del del-card-btn" data-id="${card.id}" title="Delete credit card">×</button></div></div>
       <div class="credit-card-balance">${money(balance)}</div>
       <div class="util-track"><div class="util-fill ${utilization>=50?'high':''}" style="width:${utilization}%"></div></div>
       <div class="credit-card-meta"><span>${limit ? `${Math.round(utilization)}% of ${money(limit)}` : 'No limit set'}</span><span>Statement: ${card.statementDay ? 'day '+card.statementDay : '—'}</span></div>
     </div>`;
   }).join('')}</div>`;
+  el.querySelectorAll('.del-card-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteCreditCard(btn.dataset.id));
+  });
   paymentCard.innerHTML = creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
   paymentAccount.innerHTML = `<option value="">Untracked account</option>${availableBankAccounts().map(a=>`<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}`;
   paymentForm.style.display = 'flex';
+}
+
+async function deleteCreditCard(id){
+  if(!confirm('Delete this credit card?')) return;
+  creditCards = creditCards.filter(c=>c.id!==id);
+  await window.storage.set(K_CREDIT_CARDS, JSON.stringify(creditCards));
+  renderAll();
+  showToast('Credit card deleted');
 }
 
 
@@ -1604,11 +1627,24 @@ function wireEvents(){
 
   const newRecType = document.getElementById('newRecType');
   const newRecFrequency = document.getElementById('newRecFrequency');
+  const newRecSource = document.getElementById('newRecSource');
+
   function updateNewRecUI(){
     const isIncome = newRecType.value === 'income';
     document.getElementById('newRecCategory').style.display = isIncome ? 'none' : '';
     document.getElementById('newRecDesc').placeholder = isIncome ? 'Source (e.g. Paycheck)' : 'Description';
     document.getElementById('newRecDay2').style.display = newRecFrequency.value === 'twice-monthly' ? '' : 'none';
+
+    if(newRecSource){
+      if(isIncome){
+        newRecSource.innerHTML = '<option value="">Untracked income</option>' +
+          availableBankAccounts().map(a=>`<option value="bank:${a.id}">${escapeHtml(a.name)}</option>`).join('');
+      } else {
+        newRecSource.innerHTML = '<option value="">Untracked cash / debit</option>' +
+          '<optgroup label="Bank accounts">' + availableBankAccounts().map(a=>`<option value="bank:${a.id}">${escapeHtml(a.name)}</option>`).join('') + '</optgroup>' +
+          '<optgroup label="Credit cards">' + creditCards.map(c=>`<option value="card:${c.id}">${escapeHtml(c.name)}</option>`).join('') + '</optgroup>';
+      }
+    }
   }
   newRecType.addEventListener('change', updateNewRecUI);
   newRecFrequency.addEventListener('change', updateNewRecUI);
@@ -1621,9 +1657,13 @@ function wireEvents(){
     const day = Math.min(Math.max(Number(document.getElementById('newRecDay').value)||1, 1), 28);
     const category = document.getElementById('newRecCategory').value;
     const desc = document.getElementById('newRecDesc').value.trim();
+    const sourceVal = newRecSource ? newRecSource.value : '';
+    const cardId = sourceVal.startsWith('card:') ? sourceVal.slice(5) : '';
+    const accountId = sourceVal.startsWith('bank:') ? sourceVal.slice(5) : '';
+
     if(!amount || amount<=0){ showToast('Enter an amount first'); return; }
     if(type==='expense' && !category){ showToast('Add a category first'); return; }
-    const item = {id:cryptoId(), type, category: type==='expense' ? category : '', desc, amount, frequency, day, lastGeneratedMonth:''};
+    const item = {id:cryptoId(), type, category: type==='expense' ? category : '', desc, amount, cardId, accountId, frequency, day, lastGeneratedMonth:''};
     if(frequency==='twice-monthly'){
       item.day2 = Math.min(Math.max(Number(document.getElementById('newRecDay2').value)||15, 1), 28);
     }
@@ -1693,40 +1733,6 @@ if(authToken){
 } else {
   document.getElementById('loginUser').focus();
 }
-
-//end of script 
-  document.getElementById('addBankAccountBtn').addEventListener('click', addBankAccount);
-
-  async function addBankAccount() {
-    const name = document.getElementById('bankAccountName').value.trim();
-    const type = document.getElementById('bankAccountType').value;
-    const balance = Number(document.getElementById('bankAccountBalance').value || 0);
-
-    if (!name) {
-      showToast('Enter an account name.');
-      return;
-    }
-
-    bankAccounts.push({
-      id: cryptoId(),
-      name,
-      type,
-      openingBalance: balance
-    });
-
-    await window.storage.set(K_BANK_ACCOUNTS, JSON.stringify(bankAccounts));
-
-    document.getElementById('bankAccountName').value = '';
-    document.getElementById('bankAccountBalance').value = '';
-
-    renderAccounts();
-    renderCreditCards();
-    renderExpenseAccountOptions();
-
-    showToast('Bank account added.');
-  }
-
-
 </script>
 </body>
 </html>
